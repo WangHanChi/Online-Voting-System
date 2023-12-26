@@ -23,7 +23,7 @@ void user_login(int sockfd, char *username)
         recv(sockfd, Isverify, sizeof(Isverify), 0);
         printf("%s", Isverify);
 
-        if (!strcmp("pass\n", Isverify)) {
+        if (!strncmp("pass", Isverify, 4)) {
             printf("Correct\n");
             return;
         } else {
