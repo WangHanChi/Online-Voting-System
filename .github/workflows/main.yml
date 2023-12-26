@@ -1,0 +1,15 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: build
+      run: |
+            sudo chmod +x auto-build.sh
+            . auto-build.sh
+    - name: coding-style
+      run: |
+            sudo chmod +x .github/workflows/coding-style.sh
+            sh .github/workflows/coding-style.sh
