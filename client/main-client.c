@@ -45,7 +45,7 @@ int main(int argc, char **argv)
     recv(sockfd, RecvBuffer, 10, 0);
     user->port = atoi(RecvBuffer);
 
-    while (fgets(sendline, MAXLINE, stdin) != NULL) {     
+    while (fgets(sendline, MAXLINE, stdin) != NULL) {
         send(sockfd, sendline, MAXLINE, 0);
         strncpy(user->sendline, sendline, sizeof(user->sendline));
         client_select_cmd(user);
