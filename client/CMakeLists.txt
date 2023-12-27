@@ -1,4 +1,15 @@
+cmake_minimum_required(VERSION 3.12)
 project(client)
+
+# set default build type
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release)
+endif()
+
+# check if CMAKE_BUILD_TYPE is Debug
+if(CMAKE_BUILD_TYPE MATCHES Debug)
+    add_definitions(-DDEBUG)
+endif()
 
 # client source files
 set(SOURCES
@@ -17,3 +28,17 @@ target_include_directories(CommonLib PRIVATE ${CommonLibDir}/inc)
 add_executable(client ${SOURCES}
     $<TARGET_OBJECTS:CommonLib>)
 target_include_directories(client PRIVATE ${CommonLibDir}/inc)
+
+# clang-format
+add_custom_target(format
+    COMMAND clang-format -i ${CMAKE_SOURCE_DIR}/*.c ${CMAKE_SOURCE_DIR}/*.h
+    COMMAND clang-format -i ${CommonLibDir}/src/* ${CommonLibDir}/inc/*
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
+# clean all
+add_custom_target(clean-all
+    COMMAND ${CMAKE_BUILD_TOOL} clean
+    COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/build
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
