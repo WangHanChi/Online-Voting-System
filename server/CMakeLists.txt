@@ -25,9 +25,14 @@ add_library(CommonLib OBJECT
       ${CommonLibDir}/src/unix_utils.c)
 target_include_directories(CommonLib PRIVATE ${CommonLibDir}/inc)
 
+add_library(ProtoLib OBJECT
+      ${CommonLibDir}/src/proto_lib.c)
+target_include_directories(ProtoLib PRIVATE ${CommonLibDir}/inc)
+
 # create the executable
 add_executable(server ${SOURCES}
-    $<TARGET_OBJECTS:CommonLib>)
+    $<TARGET_OBJECTS:CommonLib>
+    $<TARGET_OBJECTS:ProtoLib>)
 target_link_libraries(${PROJECT_NAME} PRIVATE pthread)
 target_include_directories(server PRIVATE ${CommonLibDir}/inc)
 
