@@ -11,8 +11,8 @@ void server_handler_help(int connfd, int ser_port, char *token)
 void server_handler_create_vote(int connfd, int ser_port, char *token)
 {
     fprintf(stdout, "server_handler_create_vote WIP~\n");
-    char recvbuffer[MAXLINE];
-    recv(connfd, recvbuffer, MAXLINE, 0);
+    char recvbuffer[MAX_MESSAGE_LENGTH];
+    recv(connfd, recvbuffer, MAX_MESSAGE_LENGTH, 0);
     fprintf(stdout, "The login user is %s\n", recvbuffer);
 }
 

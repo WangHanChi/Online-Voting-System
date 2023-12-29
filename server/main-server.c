@@ -36,7 +36,7 @@ void *handle_client(void *args)
     sprintf(port, "%d", data_port);
     send(cli_sockfd, port, sizeof(port), 0);
     fprintf(stdout, "This user's port is %s\n", port);
-    while ((n = recv(cli_sockfd, buf, MAXLINE, 0)) > 0) {
+    while ((n = recv(cli_sockfd, buf, MAX_MESSAGE_LENGTH, 0)) > 0) {
         DEBUG_INFO("String received from client: %s", buf);
         syslog_record(buf, user);
         server_select_cmd(cli_sockfd, (port_number), buf);
@@ -56,7 +56,7 @@ int main(int argc, char **argv)
     int sockfd, cli_sockfd;
     struct sockaddr_in ser_addr, cli_addr;
     socklen_t ser_len, cli_len;
-    char buf[MAXLINE];
+    char buf[MAX_MESSAGE_LENGTH];
     int on = 1;
 
     if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {

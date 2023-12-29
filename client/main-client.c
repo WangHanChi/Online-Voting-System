@@ -10,7 +10,7 @@ int main(int argc, char **argv)
             "Usage: ./client <IP address of the server> <port number>\n");
     }
     int sockfd;
-    char sendline[MAXLINE];
+    char sendline[MAX_MESSAGE_LENGTH];
     struct sockaddr_in ser_addr;
 
     if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -29,7 +29,6 @@ int main(int argc, char **argv)
 
     UserInfo_t *user = malloc(sizeof(UserInfo_t));
     user_login(sockfd, user->username);
-    user->menu_stage = 1;
     user->sockfd = sockfd;
     strncpy(user->server_addr, argv[1], strlen(argv[1]));
 
@@ -45,8 +44,8 @@ int main(int argc, char **argv)
     recv(sockfd, RecvBuffer, 10, 0);
     user->port = atoi(RecvBuffer);
 
-    while (fgets(sendline, MAXLINE, stdin) != NULL) {
-        send(sockfd, sendline, MAXLINE, 0);
+    while (fgets(sendline, MAX_MESSAGE_LENGTH, stdin) != NULL) {
+        send(sockfd, sendline, MAX_MESSAGE_LENGTH, 0);
         strncpy(user->sendline, sendline, sizeof(user->sendline));
         client_select_cmd(user);
     }
