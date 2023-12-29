@@ -23,14 +23,15 @@ int main(int argc, char **argv)
     ser_addr.sin_port = htons(atoi(argv[2]));
 
     // Connection of the client to the socket
-    if (connect(sockfd, (struct sockaddr *) &ser_addr, sizeof(ser_addr)) < 0) {
+    if (connect(sockfd, (struct sockaddr *)&ser_addr, sizeof(ser_addr)) < 0) {
         ERROR_INFO("Problem in connecting to the server\n");
     }
 
-    UserInfo_t *user = malloc(sizeof(UserInfo_t));
-    user_login(sockfd, user->username);
+    UserInfo_t *user = (UserInfo_t *)malloc(sizeof(UserInfo_t));
     user->sockfd = sockfd;
-    strncpy(user->server_addr, argv[1], strlen(argv[1]));
+    user_login(user);
+    user->server_addr = (char *)malloc(sizeof(argv[1]));
+    strncpy(user->server_addr, argv[1], sizeof(argv[1]));
 
     int ret = system("clear");
     if (ret == -1) {
@@ -39,10 +40,6 @@ int main(int argc, char **argv)
 
     fprintf(stdout, "%s", banner);
     fprintf(stdout, "%s", first_level_menu);
-
-    char RecvBuffer[10];
-    recv(sockfd, RecvBuffer, 10, 0);
-    user->port = atoi(RecvBuffer);
 
     while (fgets(sendline, MAX_MESSAGE_LENGTH, stdin) != NULL) {
         send(sockfd, sendline, MAX_MESSAGE_LENGTH, 0);

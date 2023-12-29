@@ -27,6 +27,8 @@ typedef enum {
     TOSERV_TAG_EVENT,
     TOSERV_TAG_INPORG,
     TOSERV_TAG_RESULT,
+    TOSERV_TAG_OKAY,
+    TOSERV_TAG_FAIL,
     FROMSERV_TAG_OKAY,
     FROMSERV_TAG_FAIL,
     FROMSERV_TAG_EVENTS,
@@ -46,7 +48,6 @@ typedef struct {
     char sendline[MAX_MESSAGE_LENGTH];
     int sockfd;
     char *server_addr;
-    int port;
 } UserInfo_t;
 
 /* voting struct */

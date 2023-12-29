@@ -2,7 +2,7 @@
 #include "proto.h"
 #include "unix_utils.h"
 
-int recv_packet(int fd, int *type, int *tag, size_t *data_len, void* *data)
+int recv_packet(int fd, int *type, int *tag, size_t *data_len, void **data)
 {
     int terminate = 0;
     PktHdr_t header;
@@ -16,7 +16,7 @@ int recv_packet(int fd, int *type, int *tag, size_t *data_len, void* *data)
             *data = (void *)malloc(header.payload_len);
             if (*data) {
                 ret = retry_recv(fd, *data, header.payload_len, 0);
-                if (ret != (ssize_t) header.payload_len) {  // Should not happen
+                if (ret != (ssize_t)header.payload_len) {  // Should not happen
                     free(*data);  // Release unnecessary memory
                     abort();
                 }
@@ -38,11 +38,11 @@ int send_packet(int fd, int type, int tag, size_t data_len, void *data)
     header.type = type;
     header.tag = tag;
     header.payload_len = data_len;
-    ret = retry_send(fd, (void *) &header, sizeof(header), 0);
+    ret = retry_send(fd, (void *)&header, sizeof(header), 0);
     if (ret == sizeof(header)) {
         ret = 0;
         if (data_len && data) {
-            ret = retry_send(fd, (void *) data, data_len, 0);
+            ret = retry_send(fd, (void *)data, data_len, 0);
         }
     }
     return ret;

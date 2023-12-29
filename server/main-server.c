@@ -9,37 +9,28 @@
 
 typedef struct {
     int cli_sockfd;
-    int port_number;
     char *pbuf;
 } ThreadArgs;
 
-int data_port = 1024;
-
 void *handle_client(void *args)
 {
-    ThreadArgs *threadArgs = (ThreadArgs *) args;
+    ThreadArgs *threadArgs = (ThreadArgs *)args;
     int cli_sockfd = threadArgs->cli_sockfd;
-    int port_number = threadArgs->port_number;
     char *buf = threadArgs->pbuf;
     int n = 0;
 
     fprintf(stdout, "Thread created for dealing with client requests\n");
     fprintf(stdout, "Now is dealing with <longin>\n");
-    data_port++;
 
-    char user[100] = {0};
+    char user[MAX_NAME_LENGTH] = {0};
     int verify = verify_login(cli_sockfd, user);
     if (!verify)
         return NULL;
 
-    char port[1024];
-    sprintf(port, "%d", data_port);
-    send(cli_sockfd, port, sizeof(port), 0);
-    fprintf(stdout, "This user's port is %s\n", port);
     while ((n = recv(cli_sockfd, buf, MAX_MESSAGE_LENGTH, 0)) > 0) {
         DEBUG_INFO("String received from client: %s", buf);
         syslog_record(buf, user);
-        server_select_cmd(cli_sockfd, (port_number), buf);
+        server_select_cmd(cli_sockfd, buf);
     }
 
     close(cli_sockfd);
@@ -75,7 +66,7 @@ int main(int argc, char **argv)
     }
     ser_addr.sin_port = htons(atoi(argv[1]));
     ser_len = sizeof(ser_addr);
-    if ((bind(sockfd, (struct sockaddr *) &ser_addr, ser_len)) < 0) {
+    if ((bind(sockfd, (struct sockaddr *)&ser_addr, ser_len)) < 0) {
         ERROR_INFO("Bind Error!\n");
     }
     if (listen(sockfd, LISTENQ) < 0) {
@@ -96,30 +87,29 @@ int main(int argc, char **argv)
     while (1) {
         memset(buf, 0, sizeof(buf));
         printf("\e[36;01mserver\e[33;01m>\e[0m ");
-        if ((cli_sockfd = accept(sockfd, (struct sockaddr *) &cli_addr,
-                                 (socklen_t *) &cli_len)) < 0) {
+        if ((cli_sockfd = accept(sockfd, (struct sockaddr *)&cli_addr,
+                                 (socklen_t *)&cli_len)) < 0) {
             ERROR_INFO("Accept Error!\n");
         }
 
         fprintf(stderr, "Waiting for request ...\n");
 
         // Prepare arguments for the thread
-        ThreadArgs *threadArgs = (ThreadArgs *) malloc(sizeof(ThreadArgs));
+        ThreadArgs *threadArgs = (ThreadArgs *)malloc(sizeof(ThreadArgs));
         threadArgs->cli_sockfd = cli_sockfd;
-        threadArgs->port_number = atoi(argv[1]);
         threadArgs->pbuf = buf;
 
         // Check if the thread pool is full
         if (thread_count < MAX_THREADS) {
             // Create a new thread
             pthread_create(&thread_pool[thread_count], NULL, handle_client,
-                           (void *) threadArgs);
+                           (void *)threadArgs);
             thread_count++;
         } else {
             // Wait for a thread to finish and reuse it
             pthread_join(thread_pool[thread_count % MAX_THREADS], NULL);
             pthread_create(&thread_pool[thread_count % MAX_THREADS], NULL,
-                           handle_client, (void *) threadArgs);
+                           handle_client, (void *)threadArgs);
             thread_count++;
         }
     }

@@ -26,5 +26,5 @@
             ;                              \
     } while (0);
 
-void server_select_cmd(int, int, char *);
+void server_select_cmd(int, char *);
 int verify_login(int cli_sockfd, char *user);
