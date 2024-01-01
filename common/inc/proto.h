@@ -4,25 +4,29 @@
 #include <stdlib.h>
 
 #define MAX_NAME_LENGTH 50
-#define MAX_MESSAGE_LENGTH 256
+#define MAX_MESSAGE_LENGTH 80
 #define MAX_VOTE_EVENTS 10
 #define MAX_CANDIDATES 10
 
 typedef enum {
-    TOSERV_TYPE_LOGIN = 0,
+    TOSERV_TYPE_CMD = 0,
+    TOSERV_TYPE_LOGIN,
     TOSERV_TYPE_CREATE,
     TOSERV_TYPE_VIEW,
     TOSERV_TYPE_SELECT,
     TOSERV_TYPE_LOGOUT,
     FROMSERV_TYPE_ACK,
-    FROMSERV_TYPE_RESULT
+    FROMSERV_TYPE_RESULT,
+    TYPEMAX,
 } PktType_t;
 
 typedef enum {
-    TOSERV_TAG_USERNAME = 0,
+    TOSERV_TAG_CMD = 0,
+    TOSERV_TAG_USERNAME,
     TOSERV_TAG_PASSWORD,
     TOSERV_TAG_TITLE,
     TOSERV_TAG_OPTIONS,
+    TOSERV_TAG_OPTIONNAME,
     TOSERV_TAG_DURATION,
     TOSERV_TAG_EVENT,
     TOSERV_TAG_INPORG,
@@ -34,6 +38,7 @@ typedef enum {
     FROMSERV_TAG_EVENTS,
     FROMSERV_TAG_OPTIONS,
     FROMSERV_TAG_HISTORY,
+    TAGMAX,
 } PktTag_t;
 
 typedef struct {
@@ -52,11 +57,11 @@ typedef struct {
 
 /* voting struct */
 typedef struct {
-    char issue_name[MAX_NAME_LENGTH];
-    uint8_t num_candidates;
-    char candidate_names[MAX_CANDIDATES][MAX_NAME_LENGTH];
+    char title[MAX_NAME_LENGTH];
+    uint8_t num_options;
+    char option_name[MAX_CANDIDATES][MAX_NAME_LENGTH];
     uint32_t votes[MAX_CANDIDATES];
-    uint32_t duration_time;
+    uint32_t duration;
 } VoteEvent_t;
 
 /* metadata of voting events */

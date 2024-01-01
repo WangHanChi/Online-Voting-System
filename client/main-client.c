@@ -1,5 +1,6 @@
 #include "command.h"
 #include "error.h"
+#include "proto_lib.h"
 #include "text.h"
 #include "user_login.h"
 
@@ -40,11 +41,24 @@ int main(int argc, char **argv)
 
     fprintf(stdout, "%s", banner);
     fprintf(stdout, "%s", first_level_menu);
+    fprintf(stdout, "\e[32;01m%s\e[33;01m>\e[0m ", user->username);
+    PktHdr_t packet;
+    void *pData = NULL;
 
     while (fgets(sendline, MAX_MESSAGE_LENGTH, stdin) != NULL) {
-        send(sockfd, sendline, MAX_MESSAGE_LENGTH, 0);
-        strncpy(user->sendline, sendline, sizeof(user->sendline));
-        client_select_cmd(user);
+        // send(sockfd, sendline, MAX_MESSAGE_LENGTH, 0);
+        send_packet(sockfd, TOSERV_TYPE_CMD, TOSERV_TAG_CMD, strlen(sendline),
+                    sendline);
+        recv_packet(user->sockfd, &(packet.type), &(packet.tag),
+                    &(packet.payload_len), &pData);
+        if ((packet.type < TYPEMAX) && (packet.tag < TAGMAX)) {
+            strncpy(user->sendline, sendline, sizeof(user->sendline));
+            client_select_cmd(user);
+        } else {
+            fprintf(stdout, "The packet may lost\n");
+        }
+        free(pData);
+        pData = NULL;
     }
     return 0;
 }

@@ -12,16 +12,14 @@ void user_login(UserInfo_t *user)
         char password[MAX_NAME_LENGTH] = {0};
 
         fprintf(stdout, "Please enter the username: ");
-        int ret = fscanf(stdin, "%s", username);
-        if (ret == -1) {
-            DEBUG_INFO("<fscanf> did not work");
+        if (fgets(username, sizeof(username), stdin) == NULL) {
+            fprintf(stderr, "Error reading input\n");
         }
         send_packet(user->sockfd, TOSERV_TYPE_LOGIN, TOSERV_TAG_USERNAME,
                     strlen(username), username);
         fprintf(stdout, "Please enter the password: ");
-        ret = fscanf(stdin, "%s", password);
-        if (ret == -1) {
-            DEBUG_INFO("<fscanf> did not work");
+        if (fgets(password, sizeof(password), stdin) == NULL) {
+            fprintf(stderr, "Error reading input\n");
         }
         send_packet(user->sockfd, TOSERV_TYPE_LOGIN, TOSERV_TAG_PASSWORD,
                     strlen(password), password);
@@ -39,6 +37,8 @@ void user_login(UserInfo_t *user)
 
         if (i == 2)
             ERROR_INFO("Enter wrong password over 3 times\nExit ...");
+        free(pData);
+        pData = NULL;
     }
     return;
 }

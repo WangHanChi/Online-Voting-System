@@ -3,6 +3,7 @@
 #include "error.h"
 #include "handler.h"
 #include "login.h"
+#include "proto_lib.h"
 #include "syslog.h"
 
 #define MAX_THREADS (2 * get_nprocs())
@@ -27,10 +28,23 @@ void *handle_client(void *args)
     if (!verify)
         return NULL;
 
-    while ((n = recv(cli_sockfd, buf, MAX_MESSAGE_LENGTH, 0)) > 0) {
-        DEBUG_INFO("String received from client: %s", buf);
-        syslog_record(buf, user);
-        server_select_cmd(cli_sockfd, buf);
+    PktHdr_t packet;
+    void *pData = NULL;
+
+    while (recv_packet(cli_sockfd, &(packet.type), &(packet.tag),
+                       &(packet.payload_len), &pData) == 0) {
+        if ((packet.type < TYPEMAX) && (packet.tag <= TAGMAX)) {
+            send_packet(cli_sockfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY, 0,
+                        NULL);
+            strncpy(buf, pData, packet.payload_len);
+            DEBUG_INFO("String received from client: %s", buf);
+            syslog_record(buf, user);
+            server_select_cmd(cli_sockfd, buf);
+        } else {
+            fprintf(stdout, "The packet may lost\n");
+        }
+        free(pData);
+        pData = NULL;
     }
 
     close(cli_sockfd);
