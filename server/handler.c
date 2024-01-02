@@ -110,8 +110,6 @@ void server_handler_create_vote(int connfd, char *token)
 
 void server_handler_view_inporg(int connfd, char *token)
 {
-    fprintf(stdout, "server_handler_view_inporg WIP~\n");
-
     PktHdr_t packet;
     void *pData = NULL;
     recv_packet(connfd, &(packet.type), &(packet.tag), &(packet.payload_len),
@@ -148,6 +146,41 @@ void server_handler_view_inporg(int connfd, char *token)
     }
 
     send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY, 0, NULL);
+
+    // get user want to vote or not
+    recv_packet(connfd, &(packet.type), &(packet.tag), &(packet.payload_len),
+                &pData);
+    if ((packet.type == TOSERV_TYPE_SELECT) &&
+        (packet.tag == TOSERV_TAG_VOTE)) {
+        uint8_t select_event = *(uint8_t *)pData;
+        free(pData);
+        pData = NULL;
+        send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY,
+                    sizeof(metadata.events[select_event].num_options),
+                    &(metadata.events[select_event].num_options));
+
+        recv_packet(connfd, &(packet.type), &(packet.tag),
+                    &(packet.payload_len), &pData);
+        if ((packet.type == TOSERV_TYPE_SELECT) &&
+            (packet.tag == TOSERV_TAG_VOTE)) {
+            uint8_t select_option = *(uint8_t *)pData;
+            // TODO : use lock to protect the condition variable
+            metadata.events[select_event].votes[select_option]++;
+            free(pData);
+            pData = NULL;
+        } else {
+            fprintf(stderr, "Type or Tag is wrong when receiving options\n");
+            if (packet.payload_len > 0) {
+                free(pData);
+                pData = NULL;
+            }
+        }
+        send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY, 0, NULL);
+    } else if ((packet.type == TOSERV_TYPE_SELECT) &&
+               (packet.tag == TOSERV_TAG_NOTVOTE)) {
+        send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY, 0, NULL);
+    } else
+        fprintf(stderr, "Type or Tag is wrong when receiving options\n");
 }
 
 void server_handler_view_result(int connfd, char *token)

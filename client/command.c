@@ -83,9 +83,9 @@ void client_cmd_create_vote(UserInfo_t *user)
         }
         ret = sscanf(inputbuf, "%hhu", &num_candidates);
         if ((ret != 1) || (num_candidates < 1) ||
-            (num_candidates > MAX_CANDIDATES)) {
+            (num_candidates > MAX_OPTIONS)) {
             fprintf(stderr, "Invalid input. Number should be in the 1 ~ %d\n",
-                    MAX_CANDIDATES);
+                    MAX_OPTIONS);
         } else
             break;
     }
@@ -170,9 +170,14 @@ void client_cmd_create_vote(UserInfo_t *user)
 
 void client_cmd_view_inporg(UserInfo_t *user)
 {
+    char inputbuf[MAX_MESSAGE_LENGTH] = {0};
     PktHdr_t packet;
     void *pData = NULL;
+    int ret = 0;
+    uint8_t select_event = 0;
+    uint8_t select_option = 0;
     uint8_t num_events = 0;
+    uint8_t num_option = 0;
 
     send_packet(user->sockfd, TOSERV_TYPE_VIEW, TOSERV_TAG_INPORG, 0, NULL);
     recv_packet(user->sockfd, &(packet.type), &(packet.tag),
@@ -202,6 +207,93 @@ void client_cmd_view_inporg(UserInfo_t *user)
         (packet.tag != FROMSERV_TAG_OKAY)) {
         fprintf(stdout,
                 "Something wrong when tearing down the sending options\n");
+    }
+
+    // ask user want to wote or not
+    while (1) {
+        fprintf(stdout,
+                "Do you want to vote? Enter 'Y' to confirm or any other one "
+                "key to cancel\n> ");
+        if (fgets(inputbuf, sizeof(inputbuf), stdin) == NULL) {
+            fprintf(stderr, "Error reading input\n");
+            continue;
+        }
+        if (strlen(inputbuf) == 2 &&
+            (inputbuf[1] == '\n' || inputbuf[1] == '\0')) {
+            break;
+        } else {
+            fprintf(stderr,
+                    "Invalid input. Should input Y or any other one key\n");
+        }
+    }
+
+    // user want to vote
+    if (inputbuf[0] == 'Y' || inputbuf[0] == 'y') {
+        // ask which event to select
+        while (1) {
+            memset(inputbuf, 0, MAX_MESSAGE_LENGTH);
+            fprintf(stdout,
+                    "Please Enter the number of event you want to attend\n> ");
+            if (fgets(inputbuf, sizeof(inputbuf), stdin) == NULL) {
+                fprintf(stderr, "Error reading input\n");
+                continue;
+            }
+            ret = sscanf(inputbuf, "%hhu", &select_event);
+            if ((ret != 1) || (select_event >= num_events)) {
+                fprintf(stderr,
+                        "Invalid input. Option should be in 0 ~ (%hhu)\n",
+                        num_events - 1);
+            } else {
+                break;
+            }
+        }
+
+        send_packet(user->sockfd, TOSERV_TYPE_SELECT, TOSERV_TAG_VOTE,
+                    sizeof(select_event), &select_event);
+        recv_packet(user->sockfd, &(packet.type), &(packet.tag),
+                    &(packet.payload_len), &pData);
+
+        if ((packet.type != FROMSERV_TYPE_ACK) ||
+            (packet.tag != FROMSERV_TAG_OKAY)) {
+            fprintf(stdout, "Something wrong when sending options\n");
+        }
+        num_option = *(uint8_t *)pData;
+        free(pData);
+        pData = NULL;
+
+        // ask which option to select
+        while (1) {
+            memset(inputbuf, 0, MAX_MESSAGE_LENGTH);
+            fprintf(stdout,
+                    "Please Enter the number of option you want to vote\n> ");
+            if (fgets(inputbuf, sizeof(inputbuf), stdin) == NULL) {
+                fprintf(stderr, "Error reading input\n");
+                continue;
+            }
+            ret = sscanf(inputbuf, "%hhu", &select_option);
+            if ((ret != 1) || (select_option >= num_option)) {
+                fprintf(stderr,
+                        "Invalid input. Option should be in 0 ~ (%hhu)\n",
+                        num_option - 1);
+            } else {
+                break;
+            }
+        }
+
+        send_packet(user->sockfd, TOSERV_TYPE_SELECT, TOSERV_TAG_VOTE,
+                    sizeof(select_option), &select_option);
+        recv_packet(user->sockfd, &(packet.type), &(packet.tag),
+                    &(packet.payload_len), &pData);
+    } else {
+        send_packet(user->sockfd, TOSERV_TYPE_SELECT, TOSERV_TAG_NOTVOTE, 0,
+                    NULL);
+        recv_packet(user->sockfd, &(packet.type), &(packet.tag),
+                    &(packet.payload_len), &pData);
+    }
+
+    if ((packet.type != FROMSERV_TYPE_ACK) ||
+        (packet.tag != FROMSERV_TAG_OKAY)) {
+        fprintf(stdout, "Something wrong when sending options\n");
     }
 }
 

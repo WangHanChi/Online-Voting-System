@@ -6,7 +6,7 @@
 #define MAX_NAME_LENGTH 50
 #define MAX_MESSAGE_LENGTH 80
 #define MAX_VOTE_EVENTS 10
-#define MAX_CANDIDATES 10
+#define MAX_OPTIONS 10
 
 typedef enum {
     TOSERV_TYPE_CMD = 0,
@@ -33,6 +33,8 @@ typedef enum {
     TOSERV_TAG_RESULT,
     TOSERV_TAG_OKAY,
     TOSERV_TAG_FAIL,
+    TOSERV_TAG_VOTE,
+    TOSERV_TAG_NOTVOTE,
     FROMSERV_TAG_OKAY,
     FROMSERV_TAG_FAIL,
     FROMSERV_TAG_EVENTS,
@@ -59,8 +61,8 @@ typedef struct {
 typedef struct {
     char title[MAX_NAME_LENGTH];
     uint8_t num_options;
-    char option_name[MAX_CANDIDATES][MAX_NAME_LENGTH];
-    uint32_t votes[MAX_CANDIDATES];
+    char option_name[MAX_OPTIONS][MAX_NAME_LENGTH];
+    uint32_t votes[MAX_OPTIONS];
     uint32_t duration;
 } VoteEvent_t;
 
