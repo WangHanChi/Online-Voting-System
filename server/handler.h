@@ -13,12 +13,11 @@
 #include <time.h>
 #include <unistd.h>
 
-/* max text line length */
-#define MAXLINE 4096
+#include "proto.h"
+
 /* maximum number of client connections */
 #define LISTENQ 8
-/* dir permission */
-#define DIR_MODE (S_IRWXU | S_IRWXG | S_IRWXO)
+
 
 #define DELAY_MS(x)                        \
     do {                                   \
@@ -27,5 +26,5 @@
             ;                              \
     } while (0);
 
-void server_select_cmd(int, int, char *);
+void server_select_cmd(int, char *);
 int verify_login(int cli_sockfd, char *user);

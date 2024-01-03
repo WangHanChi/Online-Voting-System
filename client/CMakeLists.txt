@@ -24,9 +24,15 @@ add_library(CommonLib OBJECT
       ${CommonLibDir}/src/unix_utils.c)
 target_include_directories(CommonLib PRIVATE ${CommonLibDir}/inc)
 
+add_library(ProtoLib OBJECT
+      ${CommonLibDir}/src/proto_lib.c)
+target_include_directories(ProtoLib PRIVATE ${CommonLibDir}/inc)
+
 # create the executable
 add_executable(client ${SOURCES}
-    $<TARGET_OBJECTS:CommonLib>)
+    $<TARGET_OBJECTS:CommonLib>
+    $<TARGET_OBJECTS:ProtoLib>)
+
 target_include_directories(client PRIVATE ${CommonLibDir}/inc)
 
 # clang-format

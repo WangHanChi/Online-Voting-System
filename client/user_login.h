@@ -13,4 +13,4 @@
 #include "command.h"
 #include "error.h"
 
-void user_login(int sockfd, char *username);
+void user_login(UserInfo_t *user);

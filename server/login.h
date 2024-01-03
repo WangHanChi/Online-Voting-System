@@ -12,3 +12,4 @@ typedef struct {
 } User;
 
 bool authenticate_user(const char *username, const char *password);
+void trim_string(char *str);
