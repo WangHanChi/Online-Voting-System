@@ -63,7 +63,7 @@ typedef struct {
     uint8_t num_options;
     char option_name[MAX_OPTIONS][MAX_NAME_LENGTH];
     uint32_t votes[MAX_OPTIONS];
-    uint32_t duration;
+    int duration;
 } VoteEvent_t;
 
 /* metadata of voting events */

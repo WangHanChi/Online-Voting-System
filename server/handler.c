@@ -5,6 +5,9 @@
 #include "history.h"
 #include <pthread.h>
 #include <assert.h>
+#include <time.h>
+
+#define UPDATE_PERIOD 100000
 
 typedef struct {
     pthread_t worker;
@@ -16,7 +19,49 @@ typedef struct {
 
 static void *_handle_worker(void *hdl_obj)
 {
-    DEBUG_INFO("Hander init success");
+    fprintf(stdout, "Hander init success\n");
+    _Handler *obj = (_Handler *)hdl_obj;
+    VotingSystem_t *metadata = (VotingSystem_t *)obj->metadata;
+    time_t prev_time, cur_time;
+    prev_time = time(NULL);
+    while (1) {
+        cur_time = time(NULL);
+        int time_diff = (int)(cur_time - prev_time);
+        pthread_mutex_lock(&obj->md_mutex);
+        for (int num = 0; num < metadata->num_events; ++num) {
+            metadata->events[num].duration -= time_diff;
+            if (metadata->events[num].duration <= 0) {
+                pthread_mutex_lock(&obj->ht_mutex);
+                obj->history_fp = fopen(HISTORY_FILENAME, "a");
+                char *data = malloc(sizeof(char) * 1024);
+
+                fprintf(obj->history_fp, "============================================\n");
+                fprintf(obj->history_fp, "Title : %s\n", metadata->events[num].title);
+                fprintf(obj->history_fp, "The result is as following:\n");
+                int top = 0;
+                for (int i = 0; i < metadata->events[num].num_options; ++i) {
+                    fprintf(obj->history_fp, "%s : %u\n",
+                        metadata->events[num].option_name[i], metadata->events[num].votes[i]);
+                    if (metadata->events[num].votes[i] > metadata->events[num].votes[top]) {
+                        top = i;
+                    }
+                }
+                fprintf(obj->history_fp, "\nThe highest result is: %s\n",
+                        metadata->events[num].option_name[top]);
+                fprintf(obj->history_fp, "============================================\n\n");
+                fclose(obj->history_fp);
+                pthread_mutex_unlock(&obj->ht_mutex);
+                memmove(&metadata->events[num], &metadata->events[num + 1],
+                        (metadata->num_events - num - 1) * sizeof(VoteEvent_t));
+                metadata->num_events--;
+                num--;
+            }
+        }
+        pthread_mutex_unlock(&obj->md_mutex);
+        // fprintf(stdout, "passed %ld seconds\n", cur_time - prev_time);
+        prev_time = cur_time;
+        usleep(UPDATE_PERIOD);
+    }
     return NULL;
 }
 
@@ -29,6 +74,7 @@ void server_handler_create_vote(int connfd, void *hdl_obj)
 {
     _Handler *obj = (_Handler *)hdl_obj;
     VotingSystem_t *metadata = (VotingSystem_t *)(obj->metadata);
+    VoteEvent_t event = {0};
     PktHdr_t packet;
     uint8_t num_candidates;
     uint32_t duration;
@@ -57,12 +103,11 @@ void server_handler_create_vote(int connfd, void *hdl_obj)
                 "Something wrong when receiving Title from Client in Create "
                 "Vote\n");
     }
-    fprintf(stdout, "metadata->num_events: %d\n", metadata->num_events);
-    strncpy(metadata->events[metadata->num_events].title, pData,
+    strncpy(event.title, pData,
             packet.payload_len);
-    trim_string(metadata->events[metadata->num_events].title);
+    trim_string(event.title);
     fprintf(stdout, "The title is %s\n",
-            metadata->events[metadata->num_events].title);
+            event.title);
     send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY, 0, NULL);
     free(pData);
     pData = NULL;
@@ -77,15 +122,15 @@ void server_handler_create_vote(int connfd, void *hdl_obj)
                 "Something wrong when receiving OPTIONS from Client in Create "
                 "Vote\n");
     }
-    metadata->events[metadata->num_events].num_options = *(uint8_t *)pData;
+    event.num_options = *(uint8_t *)pData;
     fprintf(stdout, "The number of option is %hhu\n",
-            metadata->events[metadata->num_events].num_options);
+            event.num_options);
     send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY, 0, NULL);
     free(pData);
     pData = NULL;
 
     // recv the names of per Option from client
-    for (int i = 0; i < metadata->events[metadata->num_events].num_options; ++i) {
+    for (int i = 0; i < event.num_options; ++i) {
         recv_packet(connfd, &(packet.type), &(packet.tag),
                     &(packet.payload_len), &pData);
         if ((packet.type != TOSERV_TYPE_CREATE) ||
@@ -95,11 +140,11 @@ void server_handler_create_vote(int connfd, void *hdl_obj)
                     "in Create "
                     "Vote\n");
         }
-        strncpy(metadata->events[metadata->num_events].option_name[i], pData,
+        strncpy(event.option_name[i], pData,
                 packet.payload_len);
-        trim_string(metadata->events[metadata->num_events].option_name[i]);
+        trim_string(event.option_name[i]);
         fprintf(stdout, "The the name of OPTION <%d> is %s\n", i,
-                metadata->events[metadata->num_events].option_name[i]);
+                event.option_name[i]);
         send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY, 0, NULL);
         free(pData);
         pData = NULL;
@@ -115,15 +160,17 @@ void server_handler_create_vote(int connfd, void *hdl_obj)
                 "Something wrong when receiving Duration from Client in Create "
                 "Vote\n");
     }
-    metadata->events[metadata->num_events].duration = *(uint32_t *)pData;
-    fprintf(stdout, "The Duration is %u\n",
-            metadata->events[metadata->num_events].duration);
+    event.duration = *(uint32_t *)pData * 60;
+    fprintf(stdout, "The Duration is %u\n", event.duration);
     send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY, 0, NULL);
     free(pData);
     pData = NULL;
 
     fprintf(stdout, "Completed\n");
+    pthread_mutex_lock(&obj->md_mutex);
+    memcpy((void *)&metadata->events[metadata->num_events], (void *)&event, sizeof(VoteEvent_t));
     ++metadata->num_events;
+    pthread_mutex_unlock(&obj->md_mutex);
 }
 
 void server_handler_view_inporg(int connfd, void *hdl_obj)
@@ -141,6 +188,8 @@ void server_handler_view_inporg(int connfd, void *hdl_obj)
     }
 
     char *data;
+
+    pthread_mutex_lock(&obj->md_mutex); // This part should be modified!
     for (int num = 0; num < metadata->num_events; ++num) {
         data = malloc(sizeof(char) * 1024);
         sprintf(data, "============================================\n");
@@ -150,8 +199,14 @@ void server_handler_view_inporg(int connfd, void *hdl_obj)
             sprintf(data, "%s(%d) : %s\n", data, i,
                     metadata->events[num].option_name[i]);
         }
-        sprintf(data, "%sThe remaining time is %u Mins\n", data,
-                metadata->events[num].duration);
+        uint32_t duration = metadata->events[num].duration;
+        if (duration < 60) {
+            sprintf(data, "%sThe remaining time is %u s\n", data,
+                    duration);
+        } else {
+            sprintf(data, "%sThe remaining time is %u Mins\n", data,
+                    duration / 60);
+        }
         sprintf(data, "%s============================================\n\n",
                 data);
         send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY, strlen(data),
@@ -164,6 +219,7 @@ void server_handler_view_inporg(int connfd, void *hdl_obj)
             fprintf(stdout, "Something wrong in send option <%d>\n", num);
         }
     }
+    pthread_mutex_unlock(&obj->md_mutex);
 
     send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY, 0, NULL);
 
@@ -172,6 +228,7 @@ void server_handler_view_inporg(int connfd, void *hdl_obj)
                 &pData);
     if ((packet.type == TOSERV_TYPE_SELECT) &&
         (packet.tag == TOSERV_TAG_VOTE)) {
+        pthread_mutex_lock(&obj->md_mutex); // This part should be modified!
         uint8_t select_event = *(uint8_t *)pData;
         free(pData);
         pData = NULL;
@@ -195,6 +252,7 @@ void server_handler_view_inporg(int connfd, void *hdl_obj)
                 pData = NULL;
             }
         }
+        pthread_mutex_unlock(&obj->md_mutex); // This part should be modified!
         send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY, 0, NULL);
     } else if ((packet.type == TOSERV_TYPE_SELECT) &&
                (packet.tag == TOSERV_TAG_NOTVOTE)) {
@@ -364,9 +422,7 @@ int handler_init(void **hdl_obj)
                 break;
             }
             init_step++;
-            fprintf(stdout, "sizeof vs: %ld", sizeof(VotingSystem_t));
             obj->metadata = (VotingSystem_t *)calloc(1, sizeof(VotingSystem_t));
-            fprintf(stdout, "num_events: %d", obj->metadata->num_events);
             if (!obj->metadata) {
                 ret = 1;
                 break;
@@ -418,6 +474,7 @@ void hander_delete(void *hdl_obj)
         pthread_mutex_destroy(&obj->md_mutex);
         pthread_mutex_destroy(&obj->ht_mutex);
         free(obj->metadata);
+        obj->history_fp = NULL;
         free(hdl_obj);
     }
 }
