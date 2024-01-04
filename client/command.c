@@ -327,7 +327,8 @@ void client_cmd_view_result(UserInfo_t *user)
     //     fprintf(stdout, "%s", (char *)pData);
     //     free(pData);
     //     pData = NULL;
-    //     send_packet(user->sockfd, TOSERV_TYPE_VIEW, TOSERV_TAG_OKAY, 0, NULL);
+    //     send_packet(user->sockfd, TOSERV_TYPE_VIEW, TOSERV_TAG_OKAY, 0,
+    //     NULL);
     // }
 }
 

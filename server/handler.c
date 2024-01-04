@@ -1,11 +1,11 @@
 #include "handler.h"
+#include <assert.h>
+#include <pthread.h>
+#include <time.h>
 #include "error.h"
+#include "history.h"
 #include "login.h"
 #include "proto_lib.h"
-#include "history.h"
-#include <pthread.h>
-#include <assert.h>
-#include <time.h>
 
 #define UPDATE_PERIOD 100000
 
@@ -35,20 +35,25 @@ static void *_handle_worker(void *hdl_obj)
                 obj->history_fp = fopen(HISTORY_FILENAME, "a");
                 char *data = malloc(sizeof(char) * 1024);
 
-                fprintf(obj->history_fp, "============================================\n");
-                fprintf(obj->history_fp, "Title : %s\n", metadata->events[num].title);
+                fprintf(obj->history_fp,
+                        "============================================\n");
+                fprintf(obj->history_fp, "Title : %s\n",
+                        metadata->events[num].title);
                 fprintf(obj->history_fp, "The result is as following:\n");
                 int top = 0;
                 for (int i = 0; i < metadata->events[num].num_options; ++i) {
                     fprintf(obj->history_fp, "%s : %u\n",
-                        metadata->events[num].option_name[i], metadata->events[num].votes[i]);
-                    if (metadata->events[num].votes[i] > metadata->events[num].votes[top]) {
+                            metadata->events[num].option_name[i],
+                            metadata->events[num].votes[i]);
+                    if (metadata->events[num].votes[i] >
+                        metadata->events[num].votes[top]) {
                         top = i;
                     }
                 }
                 fprintf(obj->history_fp, "\nThe highest result is: %s\n",
                         metadata->events[num].option_name[top]);
-                fprintf(obj->history_fp, "============================================\n\n");
+                fprintf(obj->history_fp,
+                        "============================================\n\n");
                 fclose(obj->history_fp);
                 pthread_mutex_unlock(&obj->ht_mutex);
                 memmove(&metadata->events[num], &metadata->events[num + 1],
@@ -103,11 +108,9 @@ void server_handler_create_vote(int connfd, void *hdl_obj)
                 "Something wrong when receiving Title from Client in Create "
                 "Vote\n");
     }
-    strncpy(event.title, pData,
-            packet.payload_len);
+    strncpy(event.title, pData, packet.payload_len);
     trim_string(event.title);
-    fprintf(stdout, "The title is %s\n",
-            event.title);
+    fprintf(stdout, "The title is %s\n", event.title);
     send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY, 0, NULL);
     free(pData);
     pData = NULL;
@@ -123,8 +126,7 @@ void server_handler_create_vote(int connfd, void *hdl_obj)
                 "Vote\n");
     }
     event.num_options = *(uint8_t *)pData;
-    fprintf(stdout, "The number of option is %hhu\n",
-            event.num_options);
+    fprintf(stdout, "The number of option is %hhu\n", event.num_options);
     send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY, 0, NULL);
     free(pData);
     pData = NULL;
@@ -140,8 +142,7 @@ void server_handler_create_vote(int connfd, void *hdl_obj)
                     "in Create "
                     "Vote\n");
         }
-        strncpy(event.option_name[i], pData,
-                packet.payload_len);
+        strncpy(event.option_name[i], pData, packet.payload_len);
         trim_string(event.option_name[i]);
         fprintf(stdout, "The the name of OPTION <%d> is %s\n", i,
                 event.option_name[i]);
@@ -168,7 +169,8 @@ void server_handler_create_vote(int connfd, void *hdl_obj)
 
     fprintf(stdout, "Completed\n");
     pthread_mutex_lock(&obj->md_mutex);
-    memcpy((void *)&metadata->events[metadata->num_events], (void *)&event, sizeof(VoteEvent_t));
+    memcpy((void *)&metadata->events[metadata->num_events], (void *)&event,
+           sizeof(VoteEvent_t));
     ++metadata->num_events;
     pthread_mutex_unlock(&obj->md_mutex);
 }
@@ -189,7 +191,7 @@ void server_handler_view_inporg(int connfd, void *hdl_obj)
 
     char *data;
 
-    pthread_mutex_lock(&obj->md_mutex); // This part should be modified!
+    pthread_mutex_lock(&obj->md_mutex);  // This part should be modified!
     for (int num = 0; num < metadata->num_events; ++num) {
         data = malloc(sizeof(char) * 1024);
         sprintf(data, "============================================\n");
@@ -201,8 +203,7 @@ void server_handler_view_inporg(int connfd, void *hdl_obj)
         }
         uint32_t duration = metadata->events[num].duration;
         if (duration < 60) {
-            sprintf(data, "%sThe remaining time is %u s\n", data,
-                    duration);
+            sprintf(data, "%sThe remaining time is %u s\n", data, duration);
         } else {
             sprintf(data, "%sThe remaining time is %u Mins\n", data,
                     duration / 60);
@@ -228,7 +229,7 @@ void server_handler_view_inporg(int connfd, void *hdl_obj)
                 &pData);
     if ((packet.type == TOSERV_TYPE_SELECT) &&
         (packet.tag == TOSERV_TAG_VOTE)) {
-        pthread_mutex_lock(&obj->md_mutex); // This part should be modified!
+        pthread_mutex_lock(&obj->md_mutex);  // This part should be modified!
         uint8_t select_event = *(uint8_t *)pData;
         free(pData);
         pData = NULL;
@@ -252,7 +253,7 @@ void server_handler_view_inporg(int connfd, void *hdl_obj)
                 pData = NULL;
             }
         }
-        pthread_mutex_unlock(&obj->md_mutex); // This part should be modified!
+        pthread_mutex_unlock(&obj->md_mutex);  // This part should be modified!
         send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY, 0, NULL);
     } else if ((packet.type == TOSERV_TYPE_SELECT) &&
                (packet.tag == TOSERV_TAG_NOTVOTE)) {
@@ -289,7 +290,8 @@ void server_handler_view_result(int connfd, void *hdl_obj)
     //             metadata.events[num].duration);
     //     sprintf(data, "%s============================================\n\n",
     //             data);
-    //     send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY, strlen(data),
+    //     send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY,
+    //     strlen(data),
     //                 data);
     //     free(data);
     //     recv_packet(connfd, &(packet.type), &(packet.tag),
