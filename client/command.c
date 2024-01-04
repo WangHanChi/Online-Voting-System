@@ -2,6 +2,33 @@
 #include "error.h"
 #include "proto_lib.h"
 
+// internal function
+static void trim_string(char *str)
+{
+    size_t len = strlen(str);
+
+    // Remove leading spaces and newline characters
+    size_t start = 0;
+    while (start < len && (str[start] == ' ' || str[start] == '\n')) {
+        ++start;
+    }
+
+    // Remove trailing spaces and newline characters
+    size_t end = len - 1;
+    while (end > start && (str[end] == ' ' || str[end] == '\n')) {
+        --end;
+    }
+
+    // Move non-empty characters to the beginning of the string
+    size_t i;
+    for (i = start; i <= end; ++i) {
+        str[i - start] = str[i];
+    }
+
+    // Add the string terminator
+    str[i - start] = '\0';
+}
+
 /* print help information */
 void client_cmd_help(UserInfo_t *user)
 {
@@ -33,11 +60,23 @@ void client_cmd_create_vote(UserInfo_t *user)
                 strlen(user->username), user->username);
     recv_packet(user->sockfd, &(packet.type), &(packet.tag),
                 &(packet.payload_len), &pData);
-    if ((packet.type != FROMSERV_TYPE_ACK) ||
-        (packet.tag != FROMSERV_TAG_OKAY)) {
+    if ((packet.type != FROMSERV_TYPE_ACK)) {
         fprintf(
             stdout,
             "Something wrong when sending username to Server in Create Vote\n");
+    } else {
+        if (packet.tag == FROMSERV_TAG_FAIL) {
+            fprintf(stdout, "%s", (char *)pData);
+            free(pData);
+            pData = NULL;
+            return;
+        } else if (packet.tag == FROMSERV_TAG_OKAY) {
+            // do nothing
+        } else {
+            fprintf(stdout,
+                    "Something wrong when sending username to Server in Create "
+                    "Vote\n");
+        }
     }
     free(pData);
     pData = NULL;
@@ -50,6 +89,7 @@ void client_cmd_create_vote(UserInfo_t *user)
             fprintf(stderr, "Error reading input\n");
             continue;
         }
+        trim_string(inputbuf);
         // Check if the input is non-empty and within the desired length
         if (strlen(inputbuf) > 0 && strlen(inputbuf) <= MAX_NAME_LENGTH) {
             break;
@@ -111,6 +151,7 @@ void client_cmd_create_vote(UserInfo_t *user)
                 fprintf(stderr, "Error reading input\n");
                 continue;
             }
+            trim_string(inputbuf);
             // Check if the input is non-empty and within the desired length
             if (strlen(inputbuf) > 0 && strlen(inputbuf) <= MAX_NAME_LENGTH) {
                 break;
@@ -345,8 +386,8 @@ const func func_table[] = {
 
 void client_select_cmd(UserInfo_t *user)
 {
-    char *token, *dummy = user->sendline;
-    token = strtok(dummy, " \n");
+    char *token = user->sendline;
+    trim_string(token);
     if (token != NULL) {
         uint8_t cmd_index = 0;
         int ret = sscanf(token, "%hhu", &cmd_index);

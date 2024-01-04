@@ -27,9 +27,19 @@ void server_handler_create_vote(int connfd, char *token)
                 "Vote\n");
     }
     fprintf(stdout, "The login user is %s\n", (char *)pData);
-    send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY, 0, NULL);
     free(pData);
     pData = NULL;
+    if (metadata.num_events >= MAX_VOTE_EVENTS) {
+        char errormsg[] =
+            "The voting event has reached its maximum limit. Please contact "
+            "the administrator for assistance!\n";
+        send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_FAIL,
+                    strlen(errormsg), errormsg);
+        return;  // should not be allowed to continue creating voting events by
+                 // users
+    } else {
+        send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY, 0, NULL);
+    }
 
     // recv Title from client
     recv_packet(connfd, &(packet.type), &(packet.tag), &(packet.payload_len),
