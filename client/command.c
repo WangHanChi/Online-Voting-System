@@ -189,6 +189,11 @@ void client_cmd_view_inporg(UserInfo_t *user)
     }
     free(pData);
     pData = NULL;
+    
+    if(num_events == 0) {
+        fprintf(stdout, "There are currently no voting events.\n");
+        return;
+    }
 
     // recv the event information
     for (int i = 0; i < num_events; ++i) {
