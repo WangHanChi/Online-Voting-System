@@ -300,6 +300,35 @@ void client_cmd_view_inporg(UserInfo_t *user)
 void client_cmd_view_result(UserInfo_t *user)
 {
     fprintf(stdout, "WIP!\n");
+    // char inputbuf[MAX_MESSAGE_LENGTH] = {0};
+    // PktHdr_t packet;
+    // void *pData = NULL;
+    // int ret = 0;
+    // uint8_t select_event = 0;
+    // uint8_t select_option = 0;
+    // uint8_t num_events = 0;
+    // uint8_t num_option = 0;
+
+    // send_packet(user->sockfd, TOSERV_TYPE_VIEW, TOSERV_TAG_RESULT, 0, NULL);
+    // recv_packet(user->sockfd, &(packet.type), &(packet.tag),
+    //             &(packet.payload_len), &pData);
+
+    // if ((packet.type == FROMSERV_TYPE_ACK) &&
+    //     (packet.tag == FROMSERV_TAG_OKAY)) {
+    //     num_events = *(uint8_t *)pData;
+    // }
+    // free(pData);
+    // pData = NULL;
+
+    // // recv the event information
+    // for (int i = 0; i < num_events; ++i) {
+    //     recv_packet(user->sockfd, &(packet.type), &(packet.tag),
+    //                 &(packet.payload_len), &pData);
+    //     fprintf(stdout, "%s", (char *)pData);
+    //     free(pData);
+    //     pData = NULL;
+    //     send_packet(user->sockfd, TOSERV_TYPE_VIEW, TOSERV_TAG_OKAY, 0, NULL);
+    // }
 }
 
 /* quit */

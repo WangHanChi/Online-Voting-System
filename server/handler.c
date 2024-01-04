@@ -2,16 +2,33 @@
 #include "error.h"
 #include "login.h"
 #include "proto_lib.h"
+#include "history.h"
+#include <pthread.h>
+#include <assert.h>
 
-VotingSystem_t metadata = {0};
+typedef struct {
+    pthread_t worker;
+    pthread_mutex_t md_mutex;
+    pthread_mutex_t ht_mutex;
+    FILE *history_fp;
+    VotingSystem_t *metadata;
+} _Handler;
 
-void server_handler_help(int connfd, char *token)
+static void *_handle_worker(void *hdl_obj)
+{
+    DEBUG_INFO("Hander init success");
+    return NULL;
+}
+
+void server_handler_help(int connfd, void *hdl_obj)
 {
     fprintf(stdout, "server_handler_help WIP~\n");
 }
 
-void server_handler_create_vote(int connfd, char *token)
+void server_handler_create_vote(int connfd, void *hdl_obj)
 {
+    _Handler *obj = (_Handler *)hdl_obj;
+    VotingSystem_t *metadata = (VotingSystem_t *)(obj->metadata);
     PktHdr_t packet;
     uint8_t num_candidates;
     uint32_t duration;
@@ -40,11 +57,12 @@ void server_handler_create_vote(int connfd, char *token)
                 "Something wrong when receiving Title from Client in Create "
                 "Vote\n");
     }
-    strncpy(metadata.events[metadata.num_events].title, pData,
+    fprintf(stdout, "metadata->num_events: %d\n", metadata->num_events);
+    strncpy(metadata->events[metadata->num_events].title, pData,
             packet.payload_len);
-    trim_string(metadata.events[metadata.num_events].title);
+    trim_string(metadata->events[metadata->num_events].title);
     fprintf(stdout, "The title is %s\n",
-            metadata.events[metadata.num_events].title);
+            metadata->events[metadata->num_events].title);
     send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY, 0, NULL);
     free(pData);
     pData = NULL;
@@ -59,15 +77,15 @@ void server_handler_create_vote(int connfd, char *token)
                 "Something wrong when receiving OPTIONS from Client in Create "
                 "Vote\n");
     }
-    metadata.events[metadata.num_events].num_options = *(uint8_t *)pData;
+    metadata->events[metadata->num_events].num_options = *(uint8_t *)pData;
     fprintf(stdout, "The number of option is %hhu\n",
-            metadata.events[metadata.num_events].num_options);
+            metadata->events[metadata->num_events].num_options);
     send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY, 0, NULL);
     free(pData);
     pData = NULL;
 
     // recv the names of per Option from client
-    for (int i = 0; i < metadata.events[metadata.num_events].num_options; ++i) {
+    for (int i = 0; i < metadata->events[metadata->num_events].num_options; ++i) {
         recv_packet(connfd, &(packet.type), &(packet.tag),
                     &(packet.payload_len), &pData);
         if ((packet.type != TOSERV_TYPE_CREATE) ||
@@ -77,11 +95,11 @@ void server_handler_create_vote(int connfd, char *token)
                     "in Create "
                     "Vote\n");
         }
-        strncpy(metadata.events[metadata.num_events].option_name[i], pData,
+        strncpy(metadata->events[metadata->num_events].option_name[i], pData,
                 packet.payload_len);
-        trim_string(metadata.events[metadata.num_events].option_name[i]);
+        trim_string(metadata->events[metadata->num_events].option_name[i]);
         fprintf(stdout, "The the name of OPTION <%d> is %s\n", i,
-                metadata.events[metadata.num_events].option_name[i]);
+                metadata->events[metadata->num_events].option_name[i]);
         send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY, 0, NULL);
         free(pData);
         pData = NULL;
@@ -97,19 +115,21 @@ void server_handler_create_vote(int connfd, char *token)
                 "Something wrong when receiving Duration from Client in Create "
                 "Vote\n");
     }
-    metadata.events[metadata.num_events].duration = *(uint32_t *)pData;
+    metadata->events[metadata->num_events].duration = *(uint32_t *)pData;
     fprintf(stdout, "The Duration is %u\n",
-            metadata.events[metadata.num_events].duration);
+            metadata->events[metadata->num_events].duration);
     send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY, 0, NULL);
     free(pData);
     pData = NULL;
 
     fprintf(stdout, "Completed\n");
-    ++metadata.num_events;
+    ++metadata->num_events;
 }
 
-void server_handler_view_inporg(int connfd, char *token)
+void server_handler_view_inporg(int connfd, void *hdl_obj)
 {
+    _Handler *obj = (_Handler *)hdl_obj;
+    VotingSystem_t *metadata = (VotingSystem_t *)(obj->metadata);
     PktHdr_t packet;
     void *pData = NULL;
     recv_packet(connfd, &(packet.type), &(packet.tag), &(packet.payload_len),
@@ -117,21 +137,21 @@ void server_handler_view_inporg(int connfd, char *token)
     if ((packet.type == TOSERV_TYPE_VIEW) &&
         (packet.tag == TOSERV_TAG_INPORG)) {
         send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY,
-                    sizeof(metadata.num_events), &metadata.num_events);
+                    sizeof(metadata->num_events), &metadata->num_events);
     }
 
     char *data;
-    for (int num = 0; num < metadata.num_events; ++num) {
+    for (int num = 0; num < metadata->num_events; ++num) {
         data = malloc(sizeof(char) * 1024);
         sprintf(data, "============================================\n");
-        sprintf(data, "%sTitle : %s\n", data, metadata.events[num].title);
+        sprintf(data, "%sTitle : %s\n", data, metadata->events[num].title);
         sprintf(data, "%sThe option is as following:\n", data);
-        for (int i = 0; i < metadata.events[num].num_options; ++i) {
+        for (int i = 0; i < metadata->events[num].num_options; ++i) {
             sprintf(data, "%s(%d) : %s\n", data, i,
-                    metadata.events[num].option_name[i]);
+                    metadata->events[num].option_name[i]);
         }
         sprintf(data, "%sThe remaining time is %u Mins\n", data,
-                metadata.events[num].duration);
+                metadata->events[num].duration);
         sprintf(data, "%s============================================\n\n",
                 data);
         send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY, strlen(data),
@@ -156,8 +176,8 @@ void server_handler_view_inporg(int connfd, char *token)
         free(pData);
         pData = NULL;
         send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY,
-                    sizeof(metadata.events[select_event].num_options),
-                    &(metadata.events[select_event].num_options));
+                    sizeof(metadata->events[select_event].num_options),
+                    &(metadata->events[select_event].num_options));
 
         recv_packet(connfd, &(packet.type), &(packet.tag),
                     &(packet.payload_len), &pData);
@@ -165,7 +185,7 @@ void server_handler_view_inporg(int connfd, char *token)
             (packet.tag == TOSERV_TAG_VOTE)) {
             uint8_t select_option = *(uint8_t *)pData;
             // TODO : use lock to protect the condition variable
-            metadata.events[select_event].votes[select_option]++;
+            metadata->events[select_event].votes[select_option]++;
             free(pData);
             pData = NULL;
         } else {
@@ -183,12 +203,47 @@ void server_handler_view_inporg(int connfd, char *token)
         fprintf(stderr, "Type or Tag is wrong when receiving options\n");
 }
 
-void server_handler_view_result(int connfd, char *token)
+void server_handler_view_result(int connfd, void *hdl_obj)
 {
     fprintf(stdout, "server_handler_view_result WIP~\n");
+    _Handler *obj = (_Handler *)hdl_obj;
+    // PktHdr_t packet;
+    // void *pData = NULL;
+    // recv_packet(connfd, &(packet.type), &(packet.tag), &(packet.payload_len),
+    //             &pData);
+    // if ((packet.type == TOSERV_TYPE_VIEW) &&
+    //     (packet.tag == TOSERV_TAG_INPORG)) {
+    //     send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY,
+    //                 sizeof(metadata.num_events), &metadata.num_events);
+    // }
+
+    // char *data;
+    // for (int num = 0; num < metadata.num_events; ++num) {
+    //     data = malloc(sizeof(char) * 1024);
+    //     sprintf(data, "============================================\n");
+    //     sprintf(data, "%sTitle : %s\n", data, metadata.events[num].title);
+    //     sprintf(data, "%sThe option is as following:\n", data);
+    //     for (int i = 0; i < metadata.events[num].num_options; ++i) {
+    //         sprintf(data, "%s(%d) : %s\n", data, i,
+    //                 metadata.events[num].option_name[i]);
+    //     }
+    //     sprintf(data, "%sThe remaining time is %u Mins\n", data,
+    //             metadata.events[num].duration);
+    //     sprintf(data, "%s============================================\n\n",
+    //             data);
+    //     send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY, strlen(data),
+    //                 data);
+    //     free(data);
+    //     recv_packet(connfd, &(packet.type), &(packet.tag),
+    //                 &(packet.payload_len), &pData);
+    //     if ((packet.type != TOSERV_TYPE_VIEW) ||
+    //         (packet.tag != TOSERV_TAG_OKAY)) {
+    //         fprintf(stdout, "Something wrong in send option <%d>\n", num);
+    //     }
+    // }
 }
 
-void server_handler_quit(int connfd, char *token)
+void server_handler_quit(int connfd, void *hdl_obj)
 {
     fprintf(stdout, "The client has quit~\n");
 }
@@ -263,7 +318,7 @@ const char *handler_str[] = {
 #undef _
 };
 
-typedef void (*func)(int, char *);
+typedef void (*func)(int, void *);
 
 const func func_table[] = {
 #define _(HANDLER, handler) server_handler_##handler,
@@ -271,7 +326,7 @@ const func func_table[] = {
 #undef _
 };
 
-void server_select_cmd(int connfd, char *sendline)
+void server_select_cmd(int connfd, char *sendline, void *hdl_obj)
 {
     char *token, *dummy = sendline;
     token = strtok(dummy, " \n");
@@ -284,9 +339,85 @@ void server_select_cmd(int connfd, char *sendline)
                     HANDLER_MAX);
         } else {
             fprintf(stdout, "cmd_index is %d\n", cmd_index);
-            func_table[cmd_index](connfd, sendline);
+            func_table[cmd_index](connfd, hdl_obj);
         }
     } else {
         printf("No command provided.\n");
+    }
+}
+
+int handler_init(void **hdl_obj)
+{
+    int ret = 0;
+    int init_step = 0;
+    *hdl_obj = calloc(1, sizeof(_Handler));
+    if (*hdl_obj) {
+        _Handler *obj = (_Handler *)*hdl_obj;
+        do {
+            ret = pthread_mutex_init(&obj->md_mutex, 0);
+            if (ret) {
+                break;
+            }
+            init_step++;
+            ret = pthread_mutex_init(&obj->ht_mutex, 0);
+            if (ret) {
+                break;
+            }
+            init_step++;
+            fprintf(stdout, "sizeof vs: %ld", sizeof(VotingSystem_t));
+            obj->metadata = (VotingSystem_t *)calloc(1, sizeof(VotingSystem_t));
+            fprintf(stdout, "num_events: %d", obj->metadata->num_events);
+            if (!obj->metadata) {
+                ret = 1;
+                break;
+            }
+            init_step++;
+            obj->history_fp = fopen(HISTORY_FILENAME, "w");
+            if (obj->history_fp == NULL) {
+                fprintf(stderr, "History file does not exist\n");
+                ret = 1;
+                break;
+            }
+            fclose(obj->history_fp);
+            init_step++;
+            ret = pthread_create(&obj->worker, NULL, _handle_worker, obj);
+            if (ret)
+                break;
+            init_step++;
+        } while (0);
+    } else {
+        ret = 1;
+    }
+    if (ret) {
+        if (*hdl_obj) {
+            _Handler *obj = (_Handler *)*hdl_obj;
+            switch (init_step) {
+            case 4:
+                obj->history_fp = NULL;
+            case 3:
+                free(obj->metadata);
+            case 2:
+                pthread_mutex_destroy(&obj->ht_mutex);
+            case 1:
+                pthread_mutex_destroy(&obj->md_mutex);
+            default:
+                free(obj);
+            }
+        }
+        *hdl_obj = NULL;
+    }
+    return ret;
+}
+
+void hander_delete(void *hdl_obj)
+{
+    if (hdl_obj != NULL) {
+        _Handler *obj = (_Handler *)hdl_obj;
+        assert(obj != NULL);
+        pthread_join(obj->worker, NULL);
+        pthread_mutex_destroy(&obj->md_mutex);
+        pthread_mutex_destroy(&obj->ht_mutex);
+        free(obj->metadata);
+        free(hdl_obj);
     }
 }

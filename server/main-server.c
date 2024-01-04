@@ -11,6 +11,7 @@
 typedef struct {
     int cli_sockfd;
     char *pbuf;
+    void *hdl_obj;
 } ThreadArgs;
 
 void *handle_client(void *args)
@@ -18,6 +19,7 @@ void *handle_client(void *args)
     ThreadArgs *threadArgs = (ThreadArgs *)args;
     int cli_sockfd = threadArgs->cli_sockfd;
     char *buf = threadArgs->pbuf;
+    void *obj = threadArgs->hdl_obj;
     int n = 0;
 
     fprintf(stdout, "Thread created for dealing with client requests\n");
@@ -39,7 +41,7 @@ void *handle_client(void *args)
             strncpy(buf, pData, packet.payload_len);
             DEBUG_INFO("String received from client: %s", buf);
             syslog_record(buf, user);
-            server_select_cmd(cli_sockfd, buf);
+            server_select_cmd(cli_sockfd, buf, obj);
         } else {
             fprintf(stdout, "The packet may lost\n");
         }
@@ -96,7 +98,14 @@ int main(int argc, char **argv)
     pthread_t thread_pool[MAX_THREADS];
     int thread_count = 0;
 
+    void *hdl_obj = NULL;
+
     syslog_init();
+    ret = handler_init(&hdl_obj);
+    if (ret) {
+        ERROR_INFO("Handler init failed!\n");
+        return ret;
+    }
 
     while (1) {
         memset(buf, 0, sizeof(buf));
@@ -112,6 +121,7 @@ int main(int argc, char **argv)
         ThreadArgs *threadArgs = (ThreadArgs *)malloc(sizeof(ThreadArgs));
         threadArgs->cli_sockfd = cli_sockfd;
         threadArgs->pbuf = buf;
+        threadArgs->hdl_obj = hdl_obj;
 
         // Check if the thread pool is full
         if (thread_count < MAX_THREADS) {
@@ -132,5 +142,6 @@ int main(int argc, char **argv)
     for (int i = 0; i < thread_count; i++) {
         pthread_join(thread_pool[i], NULL);
     }
+    handler_delete(hdl_obj);
     return 0;
 }
