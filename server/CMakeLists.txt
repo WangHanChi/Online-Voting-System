@@ -30,10 +30,15 @@ add_library(ProtoLib OBJECT
       ${CommonLibDir}/src/proto_lib.c)
 target_include_directories(ProtoLib PRIVATE ${CommonLibDir}/inc)
 
+add_library(StrLib OBJECT
+      ${CommonLibDir}/src/string_utils.c)
+target_include_directories(StrLib PRIVATE ${CommonLibDir}/inc)
+
 # create the executable
 add_executable(server ${SOURCES}
     $<TARGET_OBJECTS:CommonLib>
-    $<TARGET_OBJECTS:ProtoLib>)
+    $<TARGET_OBJECTS:ProtoLib>
+    $<TARGET_OBJECTS:StrLib>)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE pthread)
 target_include_directories(server PRIVATE ${CommonLibDir}/inc)

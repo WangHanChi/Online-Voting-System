@@ -2,6 +2,7 @@
 #include "error.h"
 #include "login.h"
 #include "proto_lib.h"
+#include "string_utils.h"
 
 VotingSystem_t metadata = {0};
 
@@ -283,8 +284,8 @@ const func func_table[] = {
 
 void server_select_cmd(int connfd, char *sendline)
 {
-    char *token, *dummy = sendline;
-    token = strtok(dummy, " \n");
+    char *token = sendline;
+    trim_string(token);
     if (token != NULL) {
         uint8_t cmd_index = 0;
         int ret = sscanf(token, "%hhu", &cmd_index);
