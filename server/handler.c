@@ -8,6 +8,7 @@
 #include "proto_lib.h"
 
 #define UPDATE_PERIOD 100000
+static uint32_t UUID = 0;
 
 typedef struct {
     pthread_t worker;
@@ -169,6 +170,7 @@ void server_handler_create_vote(int connfd, void *hdl_obj)
 
     fprintf(stdout, "Completed\n");
     pthread_mutex_lock(&obj->md_mutex);
+    metadata->events[metadata->num_events].id = UUID++;
     memcpy((void *)&metadata->events[metadata->num_events], (void *)&event,
            sizeof(VoteEvent_t));
     ++metadata->num_events;
@@ -189,6 +191,9 @@ void server_handler_view_inporg(int connfd, void *hdl_obj)
                     sizeof(metadata->num_events), &metadata->num_events);
     }
 
+    if (metadata->num_events == 0)
+        return;
+
     char *data;
 
     pthread_mutex_lock(&obj->md_mutex);  // This part should be modified!
@@ -198,8 +203,9 @@ void server_handler_view_inporg(int connfd, void *hdl_obj)
         sprintf(data, "%sTitle : %s\n", data, metadata->events[num].title);
         sprintf(data, "%sThe option is as following:\n", data);
         for (int i = 0; i < metadata->events[num].num_options; ++i) {
-            sprintf(data, "%s(%d) : %s\n", data, i,
-                    metadata->events[num].option_name[i]);
+            sprintf(data, "%s(%d) : %s\t\t| Vote : %u\n", data, i,
+                    metadata->events[num].option_name[i],
+                    metadata->events[num].votes[i]);
         }
         uint32_t duration = metadata->events[num].duration;
         if (duration < 60) {
@@ -229,32 +235,53 @@ void server_handler_view_inporg(int connfd, void *hdl_obj)
                 &pData);
     if ((packet.type == TOSERV_TYPE_SELECT) &&
         (packet.tag == TOSERV_TAG_VOTE)) {
-        pthread_mutex_lock(&obj->md_mutex);  // This part should be modified!
         uint8_t select_event = *(uint8_t *)pData;
+        uint32_t event_id = metadata->events[select_event].id;
+        DEBUG_INFO("event_id is %u\n", event_id);
         free(pData);
         pData = NULL;
         send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY,
                     sizeof(metadata->events[select_event].num_options),
                     &(metadata->events[select_event].num_options));
+        send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_EVENTSID,
+                    sizeof(select_event), &select_event);
 
         recv_packet(connfd, &(packet.type), &(packet.tag),
                     &(packet.payload_len), &pData);
         if ((packet.type == TOSERV_TYPE_SELECT) &&
             (packet.tag == TOSERV_TAG_VOTE)) {
             uint8_t select_option = *(uint8_t *)pData;
-            // TODO : use lock to protect the condition variable
-            metadata->events[select_event].votes[select_option]++;
             free(pData);
             pData = NULL;
+            recv_packet(connfd, &(packet.type), &(packet.tag),
+                        &(packet.payload_len), &pData);
+            if ((packet.type == TOSERV_TYPE_SELECT) &&
+                (packet.tag == TOSERV_TAG_EVENTID)) {
+                pthread_mutex_lock(
+                    &obj->md_mutex);  // This part should be modified!
+                if (event_id == *(uint32_t *)pData) {
+                    metadata->events[select_event].votes[select_option]++;
+                    free(pData);
+                    pData = NULL;
+                } else {
+                    char timeout_info[] =
+                        "\nThis event CANNOT be voted because of timeout!!\n";
+                    DEBUG_INFO("%s", timeout_info);
+                    send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_TIMEOUT,
+                                strlen(timeout_info), timeout_info);
+                }
+                pthread_mutex_unlock(
+                    &obj->md_mutex);  // This part should be modified!
+            }
         } else {
             fprintf(stderr, "Type or Tag is wrong when receiving options\n");
             if (packet.payload_len > 0) {
                 free(pData);
                 pData = NULL;
+                send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_FAIL, 0,
+                            NULL);
             }
         }
-        pthread_mutex_unlock(&obj->md_mutex);  // This part should be modified!
-        send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY, 0, NULL);
     } else if ((packet.type == TOSERV_TYPE_SELECT) &&
                (packet.tag == TOSERV_TAG_NOTVOTE)) {
         send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY, 0, NULL);

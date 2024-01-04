@@ -178,6 +178,7 @@ void client_cmd_view_inporg(UserInfo_t *user)
     uint8_t select_option = 0;
     uint8_t num_events = 0;
     uint8_t num_option = 0;
+    uint32_t event_id = 0;
 
     send_packet(user->sockfd, TOSERV_TYPE_VIEW, TOSERV_TAG_INPORG, 0, NULL);
     recv_packet(user->sockfd, &(packet.type), &(packet.tag),
@@ -189,8 +190,8 @@ void client_cmd_view_inporg(UserInfo_t *user)
     }
     free(pData);
     pData = NULL;
-    
-    if(num_events == 0) {
+
+    if (num_events == 0) {
         fprintf(stdout, "There are currently no voting events.\n");
         return;
     }
@@ -266,6 +267,17 @@ void client_cmd_view_inporg(UserInfo_t *user)
         free(pData);
         pData = NULL;
 
+        recv_packet(user->sockfd, &(packet.type), &(packet.tag),
+                    &(packet.payload_len), &pData);
+
+        if ((packet.type != FROMSERV_TYPE_ACK) ||
+            (packet.tag != FROMSERV_TAG_EVENTSID)) {
+            fprintf(stdout, "Something wrong when receiving eventid\n");
+        }
+        event_id = *(uint32_t *)pData;
+        free(pData);
+        pData = NULL;
+
         // ask which option to select
         while (1) {
             memset(inputbuf, 0, MAX_MESSAGE_LENGTH);
@@ -287,6 +299,8 @@ void client_cmd_view_inporg(UserInfo_t *user)
 
         send_packet(user->sockfd, TOSERV_TYPE_SELECT, TOSERV_TAG_VOTE,
                     sizeof(select_option), &select_option);
+        send_packet(user->sockfd, TOSERV_TYPE_SELECT, TOSERV_TAG_EVENTID,
+                    sizeof(event_id), &event_id);
         recv_packet(user->sockfd, &(packet.type), &(packet.tag),
                     &(packet.payload_len), &pData);
     } else {
@@ -296,8 +310,15 @@ void client_cmd_view_inporg(UserInfo_t *user)
                     &(packet.payload_len), &pData);
     }
 
-    if ((packet.type != FROMSERV_TYPE_ACK) ||
-        (packet.tag != FROMSERV_TAG_OKAY)) {
+    if (packet.type == FROMSERV_TYPE_ACK) {
+        if (packet.tag == FROMSERV_TAG_OKAY) {
+            // do nothing
+        } else if (packet.tag == FROMSERV_TAG_TIMEOUT) {
+            fprintf(stderr, "%s\n", (char *)pData);
+        } else {
+            fprintf(stdout, "Something wrong when sending options\n");
+        }
+    } else {
         fprintf(stdout, "Something wrong when sending options\n");
     }
 }
