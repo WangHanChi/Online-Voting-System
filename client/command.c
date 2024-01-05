@@ -178,7 +178,6 @@ void client_cmd_view_inporg(UserInfo_t *user)
     uint8_t select_option = 0;
     uint8_t num_events = 0;
     uint8_t num_option = 0;
-    uint32_t event_id = 0;
 
     send_packet(user->sockfd, TOSERV_TYPE_VIEW, TOSERV_TAG_INPORG, 0, NULL);
     recv_packet(user->sockfd, &(packet.type), &(packet.tag),
@@ -267,17 +266,6 @@ void client_cmd_view_inporg(UserInfo_t *user)
         free(pData);
         pData = NULL;
 
-        recv_packet(user->sockfd, &(packet.type), &(packet.tag),
-                    &(packet.payload_len), &pData);
-
-        if ((packet.type != FROMSERV_TYPE_ACK) ||
-            (packet.tag != FROMSERV_TAG_EVENTSID)) {
-            fprintf(stdout, "Something wrong when receiving eventid\n");
-        }
-        event_id = *(uint32_t *)pData;
-        free(pData);
-        pData = NULL;
-
         // ask which option to select
         while (1) {
             memset(inputbuf, 0, MAX_MESSAGE_LENGTH);
@@ -299,8 +287,8 @@ void client_cmd_view_inporg(UserInfo_t *user)
 
         send_packet(user->sockfd, TOSERV_TYPE_SELECT, TOSERV_TAG_VOTE,
                     sizeof(select_option), &select_option);
-        send_packet(user->sockfd, TOSERV_TYPE_SELECT, TOSERV_TAG_EVENTID,
-                    sizeof(event_id), &event_id);
+        send_packet(user->sockfd, TOSERV_TYPE_SELECT, TOSERV_TAG_EVENT,
+                    sizeof(select_event), &select_event);
         recv_packet(user->sockfd, &(packet.type), &(packet.tag),
                     &(packet.payload_len), &pData);
     } else {

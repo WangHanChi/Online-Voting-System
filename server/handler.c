@@ -170,7 +170,7 @@ void server_handler_create_vote(int connfd, void *hdl_obj)
 
     fprintf(stdout, "Completed\n");
     pthread_mutex_lock(&obj->md_mutex);
-    metadata->events[metadata->num_events].id = UUID++;
+    event.id = --UUID;
     memcpy((void *)&metadata->events[metadata->num_events], (void *)&event,
            sizeof(VoteEvent_t));
     ++metadata->num_events;
@@ -183,6 +183,8 @@ void server_handler_view_inporg(int connfd, void *hdl_obj)
     VotingSystem_t *metadata = (VotingSystem_t *)(obj->metadata);
     PktHdr_t packet;
     void *pData = NULL;
+    char timeout_info[] = "\nThis event CANNOT be voted because of timeout!!\n";
+
     recv_packet(connfd, &(packet.type), &(packet.tag), &(packet.payload_len),
                 &pData);
     if ((packet.type == TOSERV_TYPE_VIEW) &&
@@ -203,9 +205,8 @@ void server_handler_view_inporg(int connfd, void *hdl_obj)
         sprintf(data, "%sTitle : %s\n", data, metadata->events[num].title);
         sprintf(data, "%sThe option is as following:\n", data);
         for (int i = 0; i < metadata->events[num].num_options; ++i) {
-            sprintf(data, "%s(%d) : %s\t\t| Vote : %u\n", data, i,
-                    metadata->events[num].option_name[i],
-                    metadata->events[num].votes[i]);
+            sprintf(data, "%s(%d) : %s\n", data, i,
+                    metadata->events[num].option_name[i]);
         }
         uint32_t duration = metadata->events[num].duration;
         if (duration < 60) {
@@ -243,9 +244,6 @@ void server_handler_view_inporg(int connfd, void *hdl_obj)
         send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY,
                     sizeof(metadata->events[select_event].num_options),
                     &(metadata->events[select_event].num_options));
-        send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_EVENTSID,
-                    sizeof(select_event), &select_event);
-
         recv_packet(connfd, &(packet.type), &(packet.tag),
                     &(packet.payload_len), &pData);
         if ((packet.type == TOSERV_TYPE_SELECT) &&
@@ -256,22 +254,35 @@ void server_handler_view_inporg(int connfd, void *hdl_obj)
             recv_packet(connfd, &(packet.type), &(packet.tag),
                         &(packet.payload_len), &pData);
             if ((packet.type == TOSERV_TYPE_SELECT) &&
-                (packet.tag == TOSERV_TAG_EVENTID)) {
-                pthread_mutex_lock(
-                    &obj->md_mutex);  // This part should be modified!
-                if (event_id == *(uint32_t *)pData) {
+                (packet.tag == TOSERV_TAG_EVENT)) {
+                pthread_mutex_lock(&obj->md_mutex);
+                DEBUG_INFO("cirt is %u| %u | %u\n", *(uint8_t *)pData, event_id,
+                           metadata->events[*(uint8_t *)pData].id);
+                if (event_id == metadata->events[*(uint8_t *)pData].id) {
+                    if (metadata->num_events == 0 ||
+                        *(uint8_t *)pData >= metadata->num_events) {
+                        free(pData);
+                        pData = NULL;
+                        DEBUG_INFO("%s", timeout_info);
+                        send_packet(connfd, FROMSERV_TYPE_ACK,
+                                    FROMSERV_TAG_TIMEOUT, strlen(timeout_info),
+                                    timeout_info);
+                        pthread_mutex_unlock(&obj->md_mutex);
+                        return;
+                    }
                     metadata->events[select_event].votes[select_option]++;
                     free(pData);
                     pData = NULL;
+                    send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY, 0,
+                                NULL);
                 } else {
-                    char timeout_info[] =
-                        "\nThis event CANNOT be voted because of timeout!!\n";
+                    free(pData);
+                    pData = NULL;
                     DEBUG_INFO("%s", timeout_info);
                     send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_TIMEOUT,
                                 strlen(timeout_info), timeout_info);
                 }
-                pthread_mutex_unlock(
-                    &obj->md_mutex);  // This part should be modified!
+                pthread_mutex_unlock(&obj->md_mutex);
             }
         } else {
             fprintf(stderr, "Type or Tag is wrong when receiving options\n");
