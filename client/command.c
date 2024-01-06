@@ -1,6 +1,7 @@
 #include "command.h"
 #include "error.h"
 #include "proto_lib.h"
+#include "string_utils.h"
 
 /* print help information */
 void client_cmd_help(UserInfo_t *user)
@@ -62,6 +63,7 @@ void client_cmd_create_vote(UserInfo_t *user)
             fprintf(stderr, "Error reading input\n");
             continue;
         }
+        trim_string(inputbuf);
         // Check if the input is non-empty and within the desired length
         if (strlen(inputbuf) > 0 && strlen(inputbuf) <= MAX_NAME_LENGTH) {
             break;
@@ -123,6 +125,7 @@ void client_cmd_create_vote(UserInfo_t *user)
                 fprintf(stderr, "Error reading input\n");
                 continue;
             }
+            trim_string(inputbuf);
             // Check if the input is non-empty and within the desired length
             if (strlen(inputbuf) > 0 && strlen(inputbuf) <= MAX_NAME_LENGTH) {
                 break;
@@ -397,8 +400,8 @@ const func func_table[] = {
 
 void client_select_cmd(UserInfo_t *user)
 {
-    char *token, *dummy = user->sendline;
-    token = strtok(dummy, " \n");
+    char *token = user->sendline;
+    trim_string(token);
     if (token != NULL) {
         uint8_t cmd_index = 0;
         int ret = sscanf(token, "%hhu", &cmd_index);
