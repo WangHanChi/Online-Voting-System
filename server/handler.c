@@ -302,43 +302,64 @@ void server_handler_view_inporg(int connfd, void *hdl_obj)
 
 void server_handler_view_result(int connfd, void *hdl_obj)
 {
-    fprintf(stdout, "server_handler_view_result WIP~\n");
     _Handler *obj = (_Handler *)hdl_obj;
-    // PktHdr_t packet;
-    // void *pData = NULL;
-    // recv_packet(connfd, &(packet.type), &(packet.tag), &(packet.payload_len),
-    //             &pData);
-    // if ((packet.type == TOSERV_TYPE_VIEW) &&
-    //     (packet.tag == TOSERV_TAG_INPORG)) {
-    //     send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY,
-    //                 sizeof(metadata.num_events), &metadata.num_events);
-    // }
+    VotingSystem_t *metadata = (VotingSystem_t *)obj->metadata;
+    PktHdr_t packet;
+    void *pData = NULL;
+    long fileSize;
+    char *buffer = NULL;
+    char *errmsg;
 
-    // char *data;
-    // for (int num = 0; num < metadata.num_events; ++num) {
-    //     data = malloc(sizeof(char) * 1024);
-    //     sprintf(data, "============================================\n");
-    //     sprintf(data, "%sTitle : %s\n", data, metadata.events[num].title);
-    //     sprintf(data, "%sThe option is as following:\n", data);
-    //     for (int i = 0; i < metadata.events[num].num_options; ++i) {
-    //         sprintf(data, "%s(%d) : %s\n", data, i,
-    //                 metadata.events[num].option_name[i]);
-    //     }
-    //     sprintf(data, "%sThe remaining time is %u Mins\n", data,
-    //             metadata.events[num].duration);
-    //     sprintf(data, "%s============================================\n\n",
-    //             data);
-    //     send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY,
-    //     strlen(data),
-    //                 data);
-    //     free(data);
-    //     recv_packet(connfd, &(packet.type), &(packet.tag),
-    //                 &(packet.payload_len), &pData);
-    //     if ((packet.type != TOSERV_TYPE_VIEW) ||
-    //         (packet.tag != TOSERV_TAG_OKAY)) {
-    //         fprintf(stdout, "Something wrong in send option <%d>\n", num);
-    //     }
-    // }
+    recv_packet(connfd, &(packet.type), &(packet.tag), &(packet.payload_len),
+                &pData);
+    if ((packet.type == TOSERV_TYPE_HOSTORY) &&
+        (packet.tag == TOSERV_TAG_HOSTORY)) {
+        pthread_mutex_lock(&obj->ht_mutex);
+        do {
+            obj->history_fp = fopen(HISTORY_FILENAME, "rb");
+
+            // check history exist
+            if (obj->history_fp == NULL) {
+                errmsg = "Error when open history.txt!\n";
+                break;
+            }
+            // get file size
+            fseek(obj->history_fp, 0, SEEK_END);
+            fileSize = ftell(obj->history_fp);
+            fseek(obj->history_fp, 0, SEEK_SET);
+
+            // alloc memory
+            buffer = (char *)malloc(fileSize + 1);  // add 1 for '\0'
+            if (buffer == NULL) {
+                errmsg = "Memory allocation failed\n";
+                break;
+            }
+
+            // read file to buffer
+            size_t bytesRead = fread(buffer, 1, fileSize, obj->history_fp);
+            if (bytesRead != fileSize) {
+                errmsg = "Error when reading history\n";
+                break;
+            }
+            buffer[fileSize] = '\0';
+        } while (0);
+
+        fclose(obj->history_fp);
+        pthread_mutex_unlock(&obj->ht_mutex);
+
+        if (buffer != NULL) {
+            send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_HISTORY,
+                        strlen(buffer), buffer);
+            free(buffer);
+        } else {
+            send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_FAIL,
+                        strlen(errmsg), errmsg);
+        }
+    } else {
+        errmsg = "Error when receiving cmd\n";
+        send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_FAIL,
+                    strlen(errmsg), errmsg);
+    }
 }
 
 void server_handler_quit(int connfd, void *hdl_obj)
