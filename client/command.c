@@ -33,11 +33,23 @@ void client_cmd_create_vote(UserInfo_t *user)
                 strlen(user->username), user->username);
     recv_packet(user->sockfd, &(packet.type), &(packet.tag),
                 &(packet.payload_len), &pData);
-    if ((packet.type != FROMSERV_TYPE_ACK) ||
-        (packet.tag != FROMSERV_TAG_OKAY)) {
+    if ((packet.type != FROMSERV_TYPE_ACK)) {
         fprintf(
             stdout,
             "Something wrong when sending username to Server in Create Vote\n");
+    } else {
+        if (packet.tag == FROMSERV_TAG_FAIL) {
+            fprintf(stdout, "%s", (char *)pData);
+            free(pData);
+            pData = NULL;
+            return;
+        } else if (packet.tag == FROMSERV_TAG_OKAY) {
+            // do nothing
+        } else {
+            fprintf(stdout,
+                    "Something wrong when sending username to Server in Create "
+                    "Vote\n");
+        }
     }
     free(pData);
     pData = NULL;
