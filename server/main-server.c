@@ -27,14 +27,23 @@ void *handle_client(void *args)
 
     char user[MAX_NAME_LENGTH] = {0};
     int verify = verify_login(cli_sockfd, user);
-    if (!verify)
-        return NULL;
+    if (!verify) {
+        close(cli_sockfd);
+        free(args);
+        pthread_exit(NULL);
+    }
 
     PktHdr_t packet;
     void *pData = NULL;
 
     while (recv_packet(cli_sockfd, &(packet.type), &(packet.tag),
                        &(packet.payload_len), &pData) == 0) {
+        if ((packet.type == TOSERV_TYPE_DISCONN) &&
+            (packet.tag == TOSERV_TAG_DISCONN)) {
+            close(cli_sockfd);
+            free(args);
+            pthread_exit(NULL);
+        }
         if ((packet.type < TYPEMAX) && (packet.tag <= TAGMAX)) {
             send_packet(cli_sockfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY, 0,
                         NULL);

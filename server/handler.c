@@ -19,6 +19,14 @@ typedef struct {
     VotingSystem_t *metadata;
 } _Handler;
 
+#define ASSERT_CONNECT(packet)                      \
+    do {                                            \
+        if ((packet.type == TOSERV_TYPE_DISCONN) && \
+            (packet.tag == TOSERV_TAG_DISCONN)) {   \
+            return;                                 \
+        }                                           \
+    } while (0)
+
 static void *_handle_worker(void *hdl_obj)
 {
     fprintf(stdout, "Hander init success\n");
@@ -90,6 +98,7 @@ void server_handler_create_vote(int connfd, void *hdl_obj)
     // recv username from client
     recv_packet(connfd, &(packet.type), &(packet.tag), &(packet.payload_len),
                 &pData);
+    ASSERT_CONNECT(packet);
     if ((packet.type != TOSERV_TYPE_CREATE) ||
         (packet.tag != TOSERV_TAG_USERNAME)) {
         fprintf(stdout,
@@ -115,6 +124,7 @@ void server_handler_create_vote(int connfd, void *hdl_obj)
     // recv Title from client
     recv_packet(connfd, &(packet.type), &(packet.tag), &(packet.payload_len),
                 &pData);
+    ASSERT_CONNECT(packet);
     if ((packet.type != TOSERV_TYPE_CREATE) ||
         (packet.tag != TOSERV_TAG_TITLE)) {
         fprintf(stdout,
@@ -132,6 +142,7 @@ void server_handler_create_vote(int connfd, void *hdl_obj)
     // recv number of Options from client
     recv_packet(connfd, &(packet.type), &(packet.tag), &(packet.payload_len),
                 &pData);
+    ASSERT_CONNECT(packet);
     if ((packet.type != TOSERV_TYPE_CREATE) ||
         (packet.tag != TOSERV_TAG_OPTIONS)) {
         fprintf(stdout,
@@ -148,6 +159,7 @@ void server_handler_create_vote(int connfd, void *hdl_obj)
     for (int i = 0; i < event.num_options; ++i) {
         recv_packet(connfd, &(packet.type), &(packet.tag),
                     &(packet.payload_len), &pData);
+        ASSERT_CONNECT(packet);
         if ((packet.type != TOSERV_TYPE_CREATE) ||
             (packet.tag != TOSERV_TAG_OPTIONNAME)) {
             fprintf(stdout,
@@ -168,6 +180,7 @@ void server_handler_create_vote(int connfd, void *hdl_obj)
     // recv duration from client
     recv_packet(connfd, &(packet.type), &(packet.tag), &(packet.payload_len),
                 &pData);
+    ASSERT_CONNECT(packet);
     if ((packet.type != TOSERV_TYPE_CREATE) ||
         (packet.tag != TOSERV_TAG_DURATION)) {
         fprintf(stdout,
@@ -199,6 +212,7 @@ void server_handler_view_inporg(int connfd, void *hdl_obj)
 
     recv_packet(connfd, &(packet.type), &(packet.tag), &(packet.payload_len),
                 &pData);
+    ASSERT_CONNECT(packet);
     if ((packet.type == TOSERV_TYPE_VIEW) &&
         (packet.tag == TOSERV_TAG_INPORG)) {
         send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY,
@@ -234,6 +248,11 @@ void server_handler_view_inporg(int connfd, void *hdl_obj)
         free(data);
         recv_packet(connfd, &(packet.type), &(packet.tag),
                     &(packet.payload_len), &pData);
+        if ((packet.type == TOSERV_TYPE_DISCONN) &&
+            (packet.tag == TOSERV_TAG_DISCONN)) {
+            pthread_mutex_unlock(&obj->md_mutex);
+            return;
+        }
         if ((packet.type != TOSERV_TYPE_VIEW) ||
             (packet.tag != TOSERV_TAG_OKAY)) {
             fprintf(stdout, "Something wrong in send option <%d>\n", num);
@@ -246,6 +265,7 @@ void server_handler_view_inporg(int connfd, void *hdl_obj)
     // get user want to vote or not
     recv_packet(connfd, &(packet.type), &(packet.tag), &(packet.payload_len),
                 &pData);
+    ASSERT_CONNECT(packet);
     if ((packet.type == TOSERV_TYPE_SELECT) &&
         (packet.tag == TOSERV_TAG_VOTE)) {
         uint8_t select_event = *(uint8_t *)pData;
@@ -258,6 +278,7 @@ void server_handler_view_inporg(int connfd, void *hdl_obj)
                     &(metadata->events[select_event].num_options));
         recv_packet(connfd, &(packet.type), &(packet.tag),
                     &(packet.payload_len), &pData);
+        ASSERT_CONNECT(packet);
         if ((packet.type == TOSERV_TYPE_SELECT) &&
             (packet.tag == TOSERV_TAG_VOTE)) {
             uint8_t select_option = *(uint8_t *)pData;
@@ -265,6 +286,7 @@ void server_handler_view_inporg(int connfd, void *hdl_obj)
             pData = NULL;
             recv_packet(connfd, &(packet.type), &(packet.tag),
                         &(packet.payload_len), &pData);
+            ASSERT_CONNECT(packet);
             if ((packet.type == TOSERV_TYPE_SELECT) &&
                 (packet.tag == TOSERV_TAG_EVENT)) {
                 pthread_mutex_lock(&obj->md_mutex);
@@ -324,6 +346,7 @@ void server_handler_view_result(int connfd, void *hdl_obj)
 
     recv_packet(connfd, &(packet.type), &(packet.tag), &(packet.payload_len),
                 &pData);
+    ASSERT_CONNECT(packet);
     if ((packet.type == TOSERV_TYPE_HOSTORY) &&
         (packet.tag == TOSERV_TAG_HOSTORY)) {
         pthread_mutex_lock(&obj->ht_mutex);
@@ -393,6 +416,10 @@ int verify_login(int cli_sockfd, char *user)
 
         recv_packet(cli_sockfd, &(packet.type), &(packet.tag),
                     &(packet.payload_len), &pData);
+        if ((packet.type == TOSERV_TYPE_DISCONN) &&
+            (packet.tag == TOSERV_TAG_DISCONN)) {
+            return 0;
+        }
         if ((packet.type == TOSERV_TYPE_LOGIN) &&
             (packet.tag == TOSERV_TAG_USERNAME)) {
             strncpy(username, pData, packet.payload_len);
@@ -402,6 +429,10 @@ int verify_login(int cli_sockfd, char *user)
         pData = NULL;
         recv_packet(cli_sockfd, &(packet.type), &(packet.tag),
                     &(packet.payload_len), &pData);
+        if ((packet.type == TOSERV_TYPE_DISCONN) &&
+            (packet.tag == TOSERV_TAG_DISCONN)) {
+            return 0;
+        }
         if ((packet.type == TOSERV_TYPE_LOGIN) &&
             (packet.tag == TOSERV_TAG_PASSWORD)) {
             strncpy(password, pData, packet.payload_len);
@@ -538,7 +569,7 @@ int handler_init(void **hdl_obj)
     return ret;
 }
 
-void hander_delete(void *hdl_obj)
+void handler_delete(void *hdl_obj)
 {
     if (hdl_obj != NULL) {
         _Handler *obj = (_Handler *)hdl_obj;
