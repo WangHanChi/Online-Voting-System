@@ -26,5 +26,7 @@
             ;                              \
     } while (0);
 
-void server_select_cmd(int, char *);
+void server_select_cmd(int, char *, void *);
 int verify_login(int cli_sockfd, char *user);
+int handler_init(void **hdl_obj);
+void handler_delete(void *hdl_obj);

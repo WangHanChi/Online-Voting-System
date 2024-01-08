@@ -14,7 +14,9 @@ typedef enum {
     TOSERV_TYPE_CREATE,
     TOSERV_TYPE_VIEW,
     TOSERV_TYPE_SELECT,
+    TOSERV_TYPE_HOSTORY,
     TOSERV_TYPE_LOGOUT,
+    TOSERV_TYPE_DISCONN,
     FROMSERV_TYPE_ACK,
     FROMSERV_TYPE_RESULT,
     TYPEMAX,
@@ -29,15 +31,20 @@ typedef enum {
     TOSERV_TAG_OPTIONNAME,
     TOSERV_TAG_DURATION,
     TOSERV_TAG_EVENT,
+    TOSERV_TAG_EVENTID,
     TOSERV_TAG_INPORG,
     TOSERV_TAG_RESULT,
+    TOSERV_TAG_HOSTORY,
     TOSERV_TAG_OKAY,
     TOSERV_TAG_FAIL,
     TOSERV_TAG_VOTE,
     TOSERV_TAG_NOTVOTE,
+    TOSERV_TAG_DISCONN,
     FROMSERV_TAG_OKAY,
     FROMSERV_TAG_FAIL,
+    FROMSERV_TAG_TIMEOUT,
     FROMSERV_TAG_EVENTS,
+    FROMSERV_TAG_EVENTSID,
     FROMSERV_TAG_OPTIONS,
     FROMSERV_TAG_HISTORY,
     TAGMAX,
@@ -63,7 +70,8 @@ typedef struct {
     uint8_t num_options;
     char option_name[MAX_OPTIONS][MAX_NAME_LENGTH];
     uint32_t votes[MAX_OPTIONS];
-    uint32_t duration;
+    int duration;
+    uint32_t id;
 } VoteEvent_t;
 
 /* metadata of voting events */

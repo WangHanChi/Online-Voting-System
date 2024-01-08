@@ -1,6 +1,7 @@
 #include "command.h"
 #include "error.h"
 #include "proto_lib.h"
+#include "string_utils.h"
 
 /* print help information */
 void client_cmd_help(UserInfo_t *user)
@@ -33,11 +34,23 @@ void client_cmd_create_vote(UserInfo_t *user)
                 strlen(user->username), user->username);
     recv_packet(user->sockfd, &(packet.type), &(packet.tag),
                 &(packet.payload_len), &pData);
-    if ((packet.type != FROMSERV_TYPE_ACK) ||
-        (packet.tag != FROMSERV_TAG_OKAY)) {
+    if ((packet.type != FROMSERV_TYPE_ACK)) {
         fprintf(
             stdout,
             "Something wrong when sending username to Server in Create Vote\n");
+    } else {
+        if (packet.tag == FROMSERV_TAG_FAIL) {
+            fprintf(stdout, "%s", (char *)pData);
+            free(pData);
+            pData = NULL;
+            return;
+        } else if (packet.tag == FROMSERV_TAG_OKAY) {
+            // do nothing
+        } else {
+            fprintf(stdout,
+                    "Something wrong when sending username to Server in Create "
+                    "Vote\n");
+        }
     }
     free(pData);
     pData = NULL;
@@ -50,6 +63,7 @@ void client_cmd_create_vote(UserInfo_t *user)
             fprintf(stderr, "Error reading input\n");
             continue;
         }
+        trim_string(inputbuf);
         // Check if the input is non-empty and within the desired length
         if (strlen(inputbuf) > 0 && strlen(inputbuf) <= MAX_NAME_LENGTH) {
             break;
@@ -111,6 +125,7 @@ void client_cmd_create_vote(UserInfo_t *user)
                 fprintf(stderr, "Error reading input\n");
                 continue;
             }
+            trim_string(inputbuf);
             // Check if the input is non-empty and within the desired length
             if (strlen(inputbuf) > 0 && strlen(inputbuf) <= MAX_NAME_LENGTH) {
                 break;
@@ -189,6 +204,11 @@ void client_cmd_view_inporg(UserInfo_t *user)
     }
     free(pData);
     pData = NULL;
+
+    if (num_events == 0) {
+        fprintf(stdout, "There are currently no voting events.\n");
+        return;
+    }
 
     // recv the event information
     for (int i = 0; i < num_events; ++i) {
@@ -282,6 +302,8 @@ void client_cmd_view_inporg(UserInfo_t *user)
 
         send_packet(user->sockfd, TOSERV_TYPE_SELECT, TOSERV_TAG_VOTE,
                     sizeof(select_option), &select_option);
+        send_packet(user->sockfd, TOSERV_TYPE_SELECT, TOSERV_TAG_EVENT,
+                    sizeof(select_event), &select_event);
         recv_packet(user->sockfd, &(packet.type), &(packet.tag),
                     &(packet.payload_len), &pData);
     } else {
@@ -291,15 +313,48 @@ void client_cmd_view_inporg(UserInfo_t *user)
                     &(packet.payload_len), &pData);
     }
 
-    if ((packet.type != FROMSERV_TYPE_ACK) ||
-        (packet.tag != FROMSERV_TAG_OKAY)) {
+    if (packet.type == FROMSERV_TYPE_ACK) {
+        if (packet.tag == FROMSERV_TAG_OKAY) {
+            // do nothing
+        } else if (packet.tag == FROMSERV_TAG_TIMEOUT) {
+            fprintf(stderr, "%s\n", (char *)pData);
+        } else {
+            fprintf(stdout, "Something wrong when sending options\n");
+        }
+    } else {
         fprintf(stdout, "Something wrong when sending options\n");
     }
 }
 
 void client_cmd_view_result(UserInfo_t *user)
 {
-    fprintf(stdout, "WIP!\n");
+    char inputbuf[MAX_MESSAGE_LENGTH] = {0};
+    PktHdr_t packet;
+    void *pData = NULL;
+
+    send_packet(user->sockfd, TOSERV_TYPE_HOSTORY, TOSERV_TAG_HOSTORY, 0, NULL);
+    recv_packet(user->sockfd, &(packet.type), &(packet.tag),
+                &(packet.payload_len), &pData);
+
+    if (packet.type == FROMSERV_TYPE_ACK) {
+        if ((packet.tag == FROMSERV_TAG_HISTORY) ||
+            packet.tag == FROMSERV_TAG_FAIL) {
+            if (pData == NULL) {
+                fprintf(stdout, "%s\n",
+                        "Maybe there is no historical result yet\n");
+            } else {
+                fprintf(stdout, "%s\n", (char *)pData);
+            }
+        } else {
+            fprintf(stderr, "Error when receiving history\n!!");
+        }
+    } else
+        fprintf(stderr, "Error when receiving history\n!!");
+
+    if (packet.payload_len > 0) {
+        free(pData);
+        pData = NULL;
+    }
 }
 
 /* quit */
@@ -345,8 +400,8 @@ const func func_table[] = {
 
 void client_select_cmd(UserInfo_t *user)
 {
-    char *token, *dummy = user->sendline;
-    token = strtok(dummy, " \n");
+    char *token = user->sendline;
+    trim_string(token);
     if (token != NULL) {
         uint8_t cmd_index = 0;
         int ret = sscanf(token, "%hhu", &cmd_index);

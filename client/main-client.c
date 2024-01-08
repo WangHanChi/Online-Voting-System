@@ -1,8 +1,19 @@
+#include <signal.h>
 #include "command.h"
 #include "error.h"
 #include "proto_lib.h"
 #include "text.h"
 #include "user_login.h"
+
+UserInfo_t *user;
+
+void sigint_handler(int signum)
+{
+    send_packet(user->sockfd, TOSERV_TYPE_DISCONN, TOSERV_TAG_DISCONN, 0, NULL);
+    shutdown(user->sockfd, SHUT_RDWR);
+    fprintf(stderr, "Disconnect ....\n");
+    exit(EXIT_FAILURE);
+}
 
 int main(int argc, char **argv)
 {
@@ -10,6 +21,8 @@ int main(int argc, char **argv)
         ERROR_INFO(
             "Usage: ./client <IP address of the server> <port number>\n");
     }
+    signal(SIGINT, sigint_handler);
+
     int sockfd;
     char sendline[MAX_MESSAGE_LENGTH];
     struct sockaddr_in ser_addr;
@@ -28,7 +41,7 @@ int main(int argc, char **argv)
         ERROR_INFO("Problem in connecting to the server\n");
     }
 
-    UserInfo_t *user = (UserInfo_t *)malloc(sizeof(UserInfo_t));
+    user = (UserInfo_t *)malloc(sizeof(UserInfo_t));
     user->sockfd = sockfd;
     user_login(user);
     user->server_addr = (char *)malloc(sizeof(argv[1]));
@@ -46,7 +59,6 @@ int main(int argc, char **argv)
     void *pData = NULL;
 
     while (fgets(sendline, MAX_MESSAGE_LENGTH, stdin) != NULL) {
-        // send(sockfd, sendline, MAX_MESSAGE_LENGTH, 0);
         send_packet(sockfd, TOSERV_TYPE_CMD, TOSERV_TAG_CMD, strlen(sendline),
                     sendline);
         recv_packet(user->sockfd, &(packet.type), &(packet.tag),
