@@ -243,7 +243,7 @@ void server_handler_view_inporg(int connfd, void *hdl_obj)
         }
         sprintf(data, "%s============================================\n\n",
                 data);
-        send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY, strlen(data),
+        send_packet(connfd, FROMSERV_TYPE_ACK, FROMSERV_TAG_OKAY, strlen(data) + 1,
                     data);
         free(data);
         recv_packet(connfd, &(packet.type), &(packet.tag),
