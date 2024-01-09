@@ -1,12 +1,41 @@
 #include <pthread.h>
-#include <sys/sysinfo.h>
 #include "error.h"
 #include "handler.h"
 #include "login.h"
 #include "proto_lib.h"
 #include "syslog.h"
 
-#define MAX_THREADS (2 * get_nprocs())
+#ifdef _WIN32
+// Windows
+#include <windows.h>
+static inline int get_cores()
+{
+    SYSTEM_INFO sysinfo;
+    GetSystemInfo(&sysinfo);
+    return sysinfo.dwNumberOfProcessors;
+}
+#elif __linux__
+// Linux
+#include <sys/sysinfo.h>
+static inline int get_cores()
+{
+    return sysconf(_SC_NPROCESSORS_ONLN);
+}
+#elif __APPLE__
+// macOS
+#include <sys/sysctl.h>
+static inline int get_cores()
+{
+    int nprocs;
+    size_t len = sizeof(nprocs);
+    sysctlbyname("hw.logicalcpu", &nprocs, &len, NULL, 0);
+    return nprocs;
+}
+#else
+#error "Unsupported operating system"
+#endif
+
+#define MAX_THREADS (2 * get_cores())
 
 typedef struct {
     int cli_sockfd;
